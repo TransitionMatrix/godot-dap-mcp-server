@@ -73,7 +73,7 @@ Build a specialized MCP server that bridges Claude Code (or any MCP client) to G
 │  │ - Route to tools             │   │
 │  │ - Format responses           │   │
 │  └──────────┬───────────────────┘   │
-│             ↓                        │
+│             ↓                       │
 │  ┌──────────────────────────────┐   │
 │  │ Tool Layer (Godot-specific)  │   │
 │  │ - godot_connect              │   │
@@ -83,7 +83,7 @@ Build a specialized MCP server that bridges Claude Code (or any MCP client) to G
 │  │ - godot_evaluate             │   │
 │  │ - godot_get_variables        │   │
 │  └──────────┬───────────────────┘   │
-│             ↓                        │
+│             ↓                       │
 │  ┌──────────────────────────────┐   │
 │  │ DAP Client Layer             │   │
 │  │ - TCP connection to Godot    │   │
@@ -101,7 +101,7 @@ Build a specialized MCP server that bridges Claude Code (or any MCP client) to G
 │  ┌──────────────────────────────┐   │
 │  │ DAP Server (port 6006)       │   │
 │  └──────────┬───────────────────┘   │
-│             ↓                        │
+│             ↓                       │
 │  ┌──────────────────────────────┐   │
 │  │ EditorRunBar                 │   │
 │  │ (launches game)              │   │
