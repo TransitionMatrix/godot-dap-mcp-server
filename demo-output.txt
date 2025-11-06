@@ -1,0 +1,10 @@
+2025/11/06 14:17:08 main.go:16: Starting Godot DAP MCP Server...
+2025/11/06 14:17:08 server.go:34: Registered tool: godot_ping
+2025/11/06 14:17:08 main.go:24: Tools registered, ready to accept requests
+2025/11/06 14:17:08 server.go:39: MCP server started, listening on stdin...
+{"jsonrpc":"2.0","id":1,"result":{"capabilities":{"tools":{}},"protocolVersion":"2024-11-05","serverInfo":{"name":"godot-dap-mcp-server","version":"0.1.0"}}}
+{"jsonrpc":"2.0","id":2,"result":{"tools":[{"name":"godot_ping","description":"Test tool that echoes back a message to verify MCP server is working.\n\nThis is a diagnostic tool used to test the MCP connection and server functionality.\nIt simply echoes back the message you provide, or returns \"pong\" if no message is given.\n\nUse this to:\n- Verify the MCP server is running and responsive\n- Test the communication channel between client and server\n- Confirm tool calling mechanism is working\n\nExample: Test connection\ngodot_ping(message=\"Hello from Claude!\")","inputSchema":{"type":"object","properties":{"message":{"type":"string","description":"Message to echo back (default: 'pong')","default":"pong"}},"required":[]}}]}}
+{"jsonrpc":"2.0","id":3,"result":{"content":[{"type":"text","text":"Echo: pong"}]}}
+{"jsonrpc":"2.0","id":4,"result":{"content":[{"type":"text","text":"Echo: Test from demo"}]}}
+2025/11/06 14:17:08 server.go:47: EOF reached, shutting down...
+2025/11/06 14:17:08 main.go:31: Server shutdown complete
