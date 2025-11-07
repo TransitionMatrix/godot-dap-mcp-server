@@ -46,3 +46,8 @@ Thumbs.db
 # Test fixtures (but keep directory structure)
 tests/fixtures/**/bin/
 tests/fixtures/**/*.log
+
+# Claude Code - fetched skills (external dependencies)
+# Use .claude/scripts/setup-skills.sh to install
+# Project-specific skills should be excluded from this pattern individually
+.claude/skills/
