@@ -32,6 +32,10 @@ if [ -d "mcp-builder" ]; then
 else
     # Use git sparse-checkout to fetch only the specific subdirectory
     TEMP_DIR=$(mktemp -d)
+    if [ -z "$TEMP_DIR" ]; then
+        echo "Error: Failed to create temporary directory"
+        exit 1
+    fi
     git clone --depth 1 --filter=blob:none --sparse \
         https://github.com/sammcj/anthropic-skills-fork.git "$TEMP_DIR"
     cd "$TEMP_DIR"
@@ -48,6 +52,10 @@ fi
 #     echo "  (other-skill already exists, skipping)"
 # else
 #     TEMP_DIR=$(mktemp -d)
+#     if [ -z "$TEMP_DIR" ]; then
+#         echo "Error: Failed to create temporary directory"
+#         exit 1
+#     fi
 #     git clone --depth 1 --filter=blob:none --sparse \
 #         https://github.com/other-org/other-repo.git "$TEMP_DIR"
 #     cd "$TEMP_DIR"

@@ -12,6 +12,21 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - Based on previous DAP experimentation (11/13 commands proven working)
 - Single DAP session design (one debugging session at a time)
 
+## Available Skills
+
+The following Claude Code skills are available for this project:
+
+### mcp-builder
+**Location:** `.claude/skills/mcp-builder/` (installed via `.claude/scripts/setup-skills.sh`)
+
+**Purpose:** Provides guidance for creating high-quality MCP servers, including:
+- MCP protocol best practices
+- Tool design patterns
+- Error handling strategies
+- Testing approaches for MCP servers
+
+**When to use:** Invoke this skill when designing new MCP tools, implementing protocol features, or needing MCP-specific architectural guidance.
+
 ## Development Commands
 
 ### Building
