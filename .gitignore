@@ -50,4 +50,5 @@ tests/fixtures/**/*.log
 # Claude Code - fetched skills (external dependencies)
 # Use .claude/scripts/setup-skills.sh to install
 # Project-specific skills should be excluded from this pattern individually
-.claude/skills/
+.claude/skills/*
+!.claude/skills/memory-sync/

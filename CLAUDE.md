@@ -27,6 +27,121 @@ The following Claude Code skills are available for this project:
 
 **When to use:** Invoke this skill when designing new MCP tools, implementing protocol features, or needing MCP-specific architectural guidance.
 
+### memory-sync
+**Location:** `.claude/skills/memory-sync/`
+
+**Purpose:** Guided workflow for maintaining strategic redundancy between Serena memories and project documentation:
+- Assess what changed since last sync
+- Update memories with concise summaries
+- Flag documentation that needs comprehensive updates
+- Verify sync completeness
+
+**When to use:** After phase completions, architecture changes, new pattern discoveries, or major refactoring (5+ files changed).
+
+## Documentation
+
+Comprehensive documentation is organized into focused documents:
+
+### Core Documentation
+- **[docs/PLAN.md](docs/PLAN.md)** - Project status, implementation phases, and timeline
+- **[docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)** - System design, patterns, and critical implementation details
+- **[docs/IMPLEMENTATION_GUIDE.md](docs/IMPLEMENTATION_GUIDE.md)** - Component specifications and code examples
+- **[docs/TESTING.md](docs/TESTING.md)** - Testing strategies, procedures, and examples
+- **[docs/DEPLOYMENT.md](docs/DEPLOYMENT.md)** - Build process, distribution, and installation
+
+### Reference Documentation
+- **[docs/reference/GODOT_DAP_FAQ.md](docs/reference/GODOT_DAP_FAQ.md)** - Common questions and troubleshooting
+- **[docs/reference/DAP_PROTOCOL.md](docs/reference/DAP_PROTOCOL.md)** - Godot DAP protocol details
+- **[docs/reference/CONVENTIONS.md](docs/reference/CONVENTIONS.md)** - Naming conventions and coding standards
+- **[docs/reference/GODOT_SOURCE_ANALYSIS.md](docs/reference/GODOT_SOURCE_ANALYSIS.md)** - Findings from analyzing Godot source code
+
+**When implementing features**: Refer to ARCHITECTURE.md for patterns, IMPLEMENTATION_GUIDE.md for component specs, and reference docs for protocol details.
+
+## Code Navigation and Memory Management
+
+### Using Serena for Code Exploration
+
+This project uses **Serena** (MCP server) for token-efficient code navigation. When exploring code:
+
+**Prefer symbolic tools over reading entire files:**
+- Use `get_symbols_overview` to understand file structure before reading
+- Use `find_symbol` with `include_body: false` to explore without loading full code
+- Use `find_referencing_symbols` to understand dependencies
+- Use `search_for_pattern` for flexible regex searches
+- Only read full files when absolutely necessary
+
+**Example workflow:**
+```bash
+# 1. Get overview of a file
+get_symbols_overview(relative_path="internal/dap/client.go")
+
+# 2. Find specific symbol with depth
+find_symbol(name_path="Client", depth=1, include_body=false)
+
+# 3. Read only needed method
+find_symbol(name_path="Client/Connect", include_body=true)
+```
+
+### Project Memories (Strategic Redundancy)
+
+Project knowledge is stored in Serena memory files (`.serena/memories/`):
+- **project_overview.md** - Architecture, purpose, implementation status
+- **tech_stack.md** - Dependencies and build system
+- **code_style_and_conventions.md** - Naming patterns and error handling
+- **suggested_commands.md** - Development commands
+- **task_completion_checklist.md** - Post-task verification steps
+- **codebase_structure.md** - Directory layout and layers
+- **critical_implementation_patterns.md** - Essential patterns (event filtering, timeouts, Godot launch flow)
+
+**Memory vs Documentation Strategy:**
+
+**Serena Memories** - Quick context for code navigation (token-efficient)
+- Updated frequently as code evolves
+- Concise summaries (1-2 pages max)
+- What you need to know before exploring code
+- Reflects current code reality
+
+**Documentation** (`docs/`) - Comprehensive reference for humans
+- Stable, version-controlled knowledge
+- Full details with examples and rationale
+- Read these when implementing new features
+- Reflects intended design and best practices
+
+**When memories diverge from docs**: Memories reflect current implementation; docs reflect design intent. This divergence signals needed doc updates.
+
+### Memory Management Workflow
+
+**When to sync memories** (invoke `/memory-sync` skill):
+
+**Must sync immediately:**
+- ✅ Phase completion (update `project_overview.md` status)
+- ✅ New architectural pattern discovered (update `critical_implementation_patterns.md`)
+- ✅ Tool naming or error message pattern changes (update `code_style_and_conventions.md`)
+- ✅ Major refactoring (5+ files changed)
+
+**Should sync soon:**
+- New development commands added to workflow
+- Directory structure changes
+- Convention updates
+
+**Don't sync for:**
+- Bug fixes in existing code
+- Test additions without new patterns
+- Minor documentation updates
+- Comment improvements
+
+**To sync memories:**
+```bash
+# Invoke the memory-sync skill
+/memory-sync
+
+# Or manually:
+# 1. Review changes: git log --oneline -10
+# 2. Update affected memories: write_memory(...)
+# 3. Flag docs for comprehensive updates
+# 4. Commit changes: git commit -m "docs: sync memories with..."
+```
+
 ## Development Commands
 
 ### Building
@@ -208,80 +323,38 @@ The project is being built in phases:
 
 ## Testing Strategy
 
-### Unit Tests
-Focus on:
-- MCP protocol parsing
-- Tool parameter validation
-- Error message formatting
-- Timeout mechanisms
+Comprehensive testing documentation is available in **[docs/TESTING.md](docs/TESTING.md)**.
 
-### Integration Tests
-Requires running Godot editor with DAP enabled. Tests should verify:
-- Full MCP → DAP → Godot flow
-- Breakpoint setting and hitting
-- Variable inspection at breakpoints
-- Stepping commands execution
-- Scene launching functionality
+**Quick Reference**:
+- Unit tests: `go test ./...`
+- Integration tests: Require running Godot editor with DAP enabled
+- Test fixture project: `tests/fixtures/test-project/`
 
-Test fixture project located at: `tests/fixtures/test-project/`
-
-### Manual Testing
-Use the test Godot project to verify:
-1. Connection and capability detection
-2. Breakpoint workflow (set → launch → hit → inspect)
-3. Stepping through code (next, step-in, step-out)
-4. Variable inspection at different stack frames
-5. GDScript expression evaluation
-6. Different launch scenarios
-7. Error recovery (Godot restart, connection drops)
-8. Timeout handling on hung commands
+See [TESTING.md](docs/TESTING.md) for detailed strategies, test examples, and CI setup.
 
 ## Godot DAP Protocol Details
 
-### Connection
+Complete protocol documentation is available in **[docs/reference/DAP_PROTOCOL.md](docs/reference/DAP_PROTOCOL.md)**.
+
+**Quick Reference**:
 - Default port: 6006
-- Protocol: TCP to localhost
-- Must send `initialize` then `configurationDone`
+- Connection sequence: `initialize` → `launch` → `configurationDone`
+- Scene modes: `"main"` | `"current"` | `"res://path/to/scene.tscn"`
+- Platform: `"host"` (default) | `"android"` | `"web"`
 
-### Launch Request Arguments
-```go
-{
-    "project": "/absolute/path/to/project",  // Required, validated
-    "scene": "main" | "current" | "res://path/to/scene.tscn",
-    "platform": "host" | "android" | "web",  // Default: "host"
-    "noDebug": false,
-    "profiling": false,
-    "debug_collisions": false,
-    "debug_paths": false,
-    "debug_navigation": false,
-    "additional_options": "string"
-}
-```
+**Critical Finding**: stepOut is NOT implemented in Godot's DAP server. See [GODOT_SOURCE_ANALYSIS.md](docs/reference/GODOT_SOURCE_ANALYSIS.md).
 
-### Scene Launch Modes
-- `"main"`: Launch project's main scene (from project.godot)
-- `"current"`: Launch currently open scene in editor
-- `"res://path"`: Launch specific scene by path
+For troubleshooting, see [GODOT_DAP_FAQ.md](docs/reference/GODOT_DAP_FAQ.md).
 
 ## Common Patterns
 
-### Adding a New Tool
+Complete implementation patterns are documented in **[docs/IMPLEMENTATION_GUIDE.md](docs/IMPLEMENTATION_GUIDE.md)**.
 
-1. Create handler in appropriate file (`internal/tools/`)
-2. Define tool metadata (name, description, parameters)
-3. Implement handler function calling DAP client
-4. Register tool in `registry.go`
-5. Add unit tests
-6. Add integration test (if applicable)
-7. Document in `docs/TOOLS.md`
-
-### Adding DAP Functionality
-
-1. Implement DAP request in `internal/dap/client.go`
-2. Add timeout wrapper
-3. Add event filtering in response handler
-4. Create corresponding tool wrapper in `internal/tools/`
-5. Test with running Godot instance
+**Quick Reference**:
+- Adding a new tool: See [IMPLEMENTATION_GUIDE.md - Tool Layer](docs/IMPLEMENTATION_GUIDE.md#tool-layer)
+- Adding DAP functionality: See [IMPLEMENTATION_GUIDE.md - DAP Layer](docs/IMPLEMENTATION_GUIDE.md#dap-client-layer)
+- Tool naming convention: `godot_<action>_<object>` (see [CONVENTIONS.md](docs/reference/CONVENTIONS.md))
+- Error message pattern: Problem + Context + Solution (see [CONVENTIONS.md](docs/reference/CONVENTIONS.md#error-message-guidelines))
 
 ## Dependencies
 
@@ -295,54 +368,25 @@ Optional:
 
 ## Distribution
 
-### Binary Locations
-Compiled binaries go to: `build/`
+Complete deployment documentation is available in **[docs/DEPLOYMENT.md](docs/DEPLOYMENT.md)**.
 
-### Platforms
-- macOS (Intel): `darwin-amd64`
-- macOS (Apple Silicon): `darwin-arm64`
-- Linux: `linux-amd64`
-- Windows: `windows-amd64.exe`
+**Quick Reference**:
+- Binary location: `build/`
+- Supported platforms: macOS (Intel/ARM64), Linux, Windows
+- Build script: `./scripts/build.sh`
+- Installation: Download binary → Register with Claude Code
 
-### User Installation
-
-Users must obtain the binary then register it with Claude Code (unlike npm/Python servers):
-
-```bash
-# Quick install from releases
-mkdir -p ~/.claude/mcp-servers/godot-dap/
-curl -L -o ~/.claude/mcp-servers/godot-dap/godot-dap-mcp-server \
-  https://github.com/username/godot-dap-mcp-server/releases/download/v1.0.0/godot-dap-mcp-server-[platform]
-chmod +x ~/.claude/mcp-servers/godot-dap/godot-dap-mcp-server
-claude mcp add godot-dap ~/.claude/mcp-servers/godot-dap/godot-dap-mcp-server
-```
-
-Alternative: Build from source then register:
-```bash
-go build -o godot-dap-mcp-server cmd/godot-dap-mcp-server/main.go
-mkdir -p ~/.claude/mcp-servers/godot-dap/
-mv godot-dap-mcp-server ~/.claude/mcp-servers/godot-dap/
-claude mcp add godot-dap ~/.claude/mcp-servers/godot-dap/godot-dap-mcp-server
-```
-
-Manual config (`~/.claude/mcp.json`):
-```json
-{
-  "mcpServers": {
-    "godot-dap": {
-      "command": "/Users/username/.claude/mcp-servers/godot-dap/godot-dap-mcp-server",
-      "args": [],
-      "env": {}
-    }
-  }
-}
-```
+See [DEPLOYMENT.md](docs/DEPLOYMENT.md) for detailed build instructions, installation methods, and troubleshooting.
 
 ## Code Style
 
+Complete coding conventions are documented in **[docs/reference/CONVENTIONS.md](docs/reference/CONVENTIONS.md)**.
+
+**Quick Reference**:
 - Follow standard Go conventions (gofmt, go vet)
+- Tool naming: `godot_<action>_<object>`
+- Error messages: Problem + Context + Solution pattern
 - Use clear variable names (avoid abbreviations)
-- Add comments for non-obvious logic
-- Include context in error messages
-- Prefer explicit over clever code
 - Use context.Context for all potentially long-running operations
+
+See [CONVENTIONS.md](docs/reference/CONVENTIONS.md) for detailed guidelines and examples.
