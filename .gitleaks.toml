@@ -1,0 +1,80 @@
+# Gitleaks Configuration for godot-dap-mcp-server
+#
+# This configuration file controls how gitleaks scans for secrets in the repository.
+# Gitleaks uses a comprehensive built-in ruleset that catches common secrets like:
+# - API keys (AWS, GCP, Azure, GitHub, etc.)
+# - Private keys (RSA, SSH, PGP)
+# - Database credentials
+# - JWT tokens
+# - OAuth tokens
+# - And many more...
+#
+# Documentation: https://github.com/gitleaks/gitleaks
+#
+# To test manually:
+#   gitleaks detect --verbose --source .
+#
+# To scan specific files:
+#   gitleaks protect --staged --verbose
+
+title = "Gitleaks configuration for godot-dap-mcp-server"
+
+# Use gitleaks' default rules (comprehensive secret detection)
+# These are maintained by the gitleaks team and cover 100+ secret types
+[extend]
+useDefault = true
+
+# Allowlist: Patterns and paths to explicitly ignore
+# Add entries here for known false positives or test data
+[allowlist]
+description = "Allowlist for known false positives and build artifacts"
+
+# Paths to ignore (uses regex patterns)
+paths = [
+    # Build artifacts
+    '''build/.*''',
+    '''dist/.*''',
+    '''vendor/.*''',
+
+    # Test binaries
+    '''.*\.test$''',
+
+    # Example: Ignore test fixtures that intentionally contain fake secrets
+    # '''tests/fixtures/.*''',
+
+    # Example: Ignore demo files
+    # '''demo-.*\.jsonl'''
+]
+
+# Regexes: Ignore specific patterns that are commonly flagged
+regexes = [
+    # Example: Ignore strings that look like keys but are documentation
+    # '''(?i)example[_-]?api[_-]?key'''
+]
+
+# Commits: Ignore specific commit SHAs (use for historical false positives)
+commits = [
+    # Example: "abc123def456"
+]
+
+# Stopwords: Ignore specific strings (exact matches)
+stopwords = [
+    # Example: "EXAMPLE_API_KEY_DO_NOT_USE"
+]
+
+# Custom rules (optional): Add project-specific secret patterns
+# Uncomment and modify if you have project-specific secret formats
+# [[rules]]
+# id = "godot-custom-token"
+# description = "Godot-specific authentication token"
+# regex = '''godot_token_[a-zA-Z0-9]{32}'''
+# tags = ["godot", "token"]
+
+# Entropy detection settings (optional)
+# Gitleaks can detect high-entropy strings that might be secrets
+# [[rules]]
+# id = "high-entropy-strings"
+# description = "Detect high-entropy strings (potential secrets)"
+# regex = '''[a-zA-Z0-9+/]{40,}'''
+# entropy = 4.5  # Strings with entropy >= 4.5 will be flagged
+# tags = ["entropy"]

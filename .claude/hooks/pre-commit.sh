@@ -1,16 +1,61 @@
 #!/bin/bash
 #
-# Pre-commit hook reminder for memory sync
-# This hook provides a reminder to sync memories when significant code changes are made.
-# It is NON-BLOCKING - it only reminds, never prevents commits.
+# Pre-commit hook for godot-dap-mcp-server
+#
+# Security Checks (BLOCKING):
+#   - Gitleaks: Scans for secrets, API keys, credentials
+#
+# Development Reminders (NON-BLOCKING):
+#   - Memory sync reminders for significant code changes
 #
 # To enable this hook in your git repository:
 #   ln -sf ../../.claude/hooks/pre-commit.sh .git/hooks/pre-commit
 #
 
 # Colors for output
+RED='\033[1;31m'
 YELLOW='\033[1;33m'
+GREEN='\033[1;32m'
 NC='\033[0m' # No Color
+
+#######################################
+# SECURITY CHECKS (BLOCKING)
+#######################################
+
+# Check for secrets using gitleaks
+if command -v gitleaks &> /dev/null; then
+    echo -e "${GREEN}🔒 Running gitleaks secret detection...${NC}"
+
+    # Run gitleaks on staged files
+    if ! gitleaks protect --staged --verbose --redact --no-banner 2>&1; then
+        echo ""
+        echo -e "${RED}❌ COMMIT BLOCKED: Gitleaks detected potential secrets!${NC}"
+        echo ""
+        echo "   Gitleaks found patterns that may be secrets, API keys, or credentials."
+        echo ""
+        echo "   Next steps:"
+        echo "   1. Review the findings above carefully"
+        echo "   2. Remove any actual secrets from your code"
+        echo "   3. If this is a false positive, add to .gitleaks.toml allowlist"
+        echo "   4. Consider using environment variables or config files for secrets"
+        echo ""
+        echo "   To bypass this check (NOT RECOMMENDED for public repos):"
+        echo "   git commit --no-verify"
+        echo ""
+        exit 1
+    fi
+    echo -e "${GREEN}✓ No secrets detected${NC}"
+    echo ""
+else
+    echo -e "${YELLOW}⚠️  Gitleaks not installed - skipping secret detection${NC}"
+    echo "   Install with: brew install gitleaks"
+    echo "   Or download from: https://github.com/gitleaks/gitleaks/releases"
+    echo ""
+fi
+
+#######################################
+# DEVELOPMENT REMINDERS (NON-BLOCKING)
+#######################################
 
 # Check if this is a significant change that might require memory sync
 significant_changes=false
