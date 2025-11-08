@@ -142,6 +142,54 @@ Project knowledge is stored in Serena memory files (`.serena/memories/`):
 # 4. Commit changes: git commit -m "docs: sync memories with..."
 ```
 
+### Godot Source Reference (godot-source)
+
+The `godot-source` MCP server provides access to the **Godot engine C++ source code** at `/Users/adp/Projects/godot`. Use this when implementing DAP features to understand Godot's reference implementation.
+
+**Available memory files (14 total):**
+
+**DAP Protocol Implementation:**
+- `dap_architecture_overview` - Architecture of Godot's DAP server
+- `dap_implementation_reference` - Code examples and implementation patterns
+- `dap_supported_commands` - Which DAP commands Godot implements
+- `dap_events_and_notifications` - Event handling and async notifications
+- `dap_connection_and_config` - Connection setup and configuration
+- `dap_known_issues_and_quirks` - Known bugs (e.g., stepOut hang)
+- `dap_faq_for_clients` - Common questions for DAP client developers
+
+**Godot Engine Core:**
+- `codebase_structure` - Directory layout and module organization
+- `build_system` - SCons build system details
+- `object_system_architecture` - Godot's Object class system
+- `code_style_and_conventions` - C++ coding standards
+- `project_overview` - Overview of the Godot engine codebase
+- `suggested_commands` - Common development commands
+- `task_completion_checklist` - Verification steps
+
+**When to consult godot-source:**
+- ✅ Implementing new DAP tools (see how Godot handles the command)
+- ✅ Debugging protocol issues (understand Godot's expectations)
+- ✅ Investigating quirks or unexpected behavior
+- ✅ Validating command parameters and response formats
+- ✅ Understanding event filtering patterns
+
+**Example workflow:**
+```bash
+# Check if Godot implements a command before adding tool
+mcp__godot-source__read_memory("dap_supported_commands")
+
+# Understand event handling before implementing
+mcp__godot-source__read_memory("dap_events_and_notifications")
+
+# Find how Godot handles a specific DAP command
+mcp__godot-source__find_symbol("DebugAdapterProtocol/handle_request")
+```
+
+**Tool naming clarity:**
+- `mcp__source__*` → Navigate **our** Go DAP client code
+- `mcp__godot-source__*` → Navigate **Godot's** C++ DAP server code
+- `./godot-dap-mcp-server` → The compiled MCP server binary
+
 ## Development Commands
 
 ### Building
