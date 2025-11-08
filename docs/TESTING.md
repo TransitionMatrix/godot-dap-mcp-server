@@ -304,15 +304,68 @@ func TestErrorMessageFormat(t *testing.T) {
 
 ## Integration Tests
 
-Location: `tests/integration/`
+**Status**: ✅ Fully implemented and working (Phase 3)
 
-**Purpose**: Test full MCP → DAP → Godot flow with a running Godot editor.
+Location: `scripts/` and `tests/`
 
-### Setup Requirements
+**Purpose**: Test full MCP → DAP → Godot flow with real Godot editor.
 
+### Automated Integration Test
+
+**Script**: `scripts/automated-integration-test.sh`
+
+**Features**:
+- ✅ Fully automated - no manual setup required
+- ✅ Launches Godot as subprocess in headless mode
+- ✅ Auto-detects DAP port availability (6006-6020)
+- ✅ Persistent MCP session via named pipes
+- ✅ Tests all 7 Phase 3 tools
+- ✅ Cleans up processes on exit
+
+**Usage**:
+```bash
+# Requires Godot 4.2.2+ in PATH (or set GODOT_BIN)
+./scripts/automated-integration-test.sh
+```
+
+**Tests Performed**:
+1. MCP server initialization
+2. Tool registration (7 tools)
+3. Connect to Godot DAP server
+4. Set breakpoint (with verification)
+5. Clear breakpoint
+6. Disconnect from Godot
+
+### Manual Integration Test
+
+**Script**: `scripts/integration-test.sh`
+
+**Use Case**: Testing with a running Godot editor (user-controlled)
+
+**Setup Requirements**:
 1. Godot editor running with DAP enabled
 2. Test project loaded (from `tests/fixtures/test-project/`)
 3. DAP server listening on port 6006
+
+**Usage**:
+```bash
+# 1. Open Godot editor
+# 2. Enable DAP in Editor Settings
+# 3. Run script
+./scripts/integration-test.sh
+```
+
+### Test Project
+
+**Location**: `tests/fixtures/test-project/`
+
+**Contents**:
+- `project.godot` - Minimal Godot 4.3 project
+- `test_script.gd` - GDScript with breakpoint locations (lines 13, 18)
+- `test_scene.tscn` - Scene that runs the test script
+- `README.md` - Test project documentation
+
+See `tests/INTEGRATION_TEST.md` for complete integration testing guide.
 
 ### Test Scenarios
 
@@ -582,30 +635,22 @@ go tool cover -html=coverage.out
 ### Integration Tests
 
 ```bash
-# Skip integration tests (for quick feedback)
-go test -short ./...
+# Automated integration test (fully automated with Godot subprocess)
+./scripts/automated-integration-test.sh
 
-# Run only integration tests
-go test ./tests/integration/...
+# Manual integration test (requires running Godot editor)
+./scripts/integration-test.sh
 
-# Run integration tests with longer timeout
-go test -timeout 5m ./tests/integration/...
+# Custom Godot path
+export GODOT_BIN=/path/to/godot
+./scripts/automated-integration-test.sh
+
+# Custom DAP port
+export DAP_PORT=6007
+./scripts/integration-test.sh
 ```
 
-### Manual Testing Script
-
-Create `scripts/manual-test.sh`:
-
-```bash
-#!/bin/bash
-
-# Start Godot with test project
-echo "Starting Godot with test project..."
-godot --path tests/fixtures/test-project &
-GODOT_PID=$!
-
-# Wait for Godot to start
-sleep 5
+See `tests/INTEGRATION_TEST.md` for detailed integration testing guide.
 
 # Run MCP server for manual testing
 echo "Starting MCP server..."

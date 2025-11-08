@@ -1,6 +1,7 @@
 package mcp
 
 import (
+	"encoding/json"
 	"fmt"
 	"io"
 	"log"
@@ -212,7 +213,12 @@ func formatResult(result interface{}) string {
 		return v.Error()
 	default:
 		// For complex types, return JSON representation
-		return fmt.Sprintf("%+v", v)
+		jsonBytes, err := json.Marshal(v)
+		if err != nil {
+			// Fallback to fmt if JSON marshaling fails
+			return fmt.Sprintf("%+v", v)
+		}
+		return string(jsonBytes)
 	}
 }
 

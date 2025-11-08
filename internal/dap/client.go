@@ -182,3 +182,150 @@ func (c *Client) ConfigurationDone(ctx context.Context) error {
 	_, err := c.waitForResponse(ctx, "configurationDone")
 	return err
 }
+
+// SetBreakpoints sets breakpoints for a specific file
+// Returns the verified breakpoint information from the server
+func (c *Client) SetBreakpoints(ctx context.Context, file string, lines []int) (*dap.SetBreakpointsResponse, error) {
+	// Convert line numbers to breakpoints
+	breakpoints := make([]dap.SourceBreakpoint, len(lines))
+	for i, line := range lines {
+		breakpoints[i] = dap.SourceBreakpoint{
+			Line: line,
+		}
+	}
+
+	request := &dap.SetBreakpointsRequest{
+		Request: dap.Request{
+			ProtocolMessage: dap.ProtocolMessage{
+				Seq:  c.nextRequestSeq(),
+				Type: "request",
+			},
+			Command: "setBreakpoints",
+		},
+		Arguments: dap.SetBreakpointsArguments{
+			Source: dap.Source{
+				Path: file,
+			},
+			Breakpoints: breakpoints,
+		},
+	}
+
+	if err := c.write(request); err != nil {
+		return nil, fmt.Errorf("failed to send setBreakpoints request: %w", err)
+	}
+
+	// Wait for setBreakpoints response
+	response, err := c.waitForResponse(ctx, "setBreakpoints")
+	if err != nil {
+		return nil, err
+	}
+
+	bpResp, ok := response.(*dap.SetBreakpointsResponse)
+	if !ok {
+		return nil, fmt.Errorf("unexpected response type: %T", response)
+	}
+
+	return bpResp, nil
+}
+
+// Continue resumes execution of the specified thread
+// Use threadId 0 to continue all threads (Godot typically uses single thread)
+func (c *Client) Continue(ctx context.Context, threadId int) (*dap.ContinueResponse, error) {
+	request := &dap.ContinueRequest{
+		Request: dap.Request{
+			ProtocolMessage: dap.ProtocolMessage{
+				Seq:  c.nextRequestSeq(),
+				Type: "request",
+			},
+			Command: "continue",
+		},
+		Arguments: dap.ContinueArguments{
+			ThreadId: threadId,
+		},
+	}
+
+	if err := c.write(request); err != nil {
+		return nil, fmt.Errorf("failed to send continue request: %w", err)
+	}
+
+	// Wait for continue response
+	response, err := c.waitForResponse(ctx, "continue")
+	if err != nil {
+		return nil, err
+	}
+
+	contResp, ok := response.(*dap.ContinueResponse)
+	if !ok {
+		return nil, fmt.Errorf("unexpected response type: %T", response)
+	}
+
+	return contResp, nil
+}
+
+// Next steps over the current line (step over)
+// Use threadId from the stopped event
+func (c *Client) Next(ctx context.Context, threadId int) (*dap.NextResponse, error) {
+	request := &dap.NextRequest{
+		Request: dap.Request{
+			ProtocolMessage: dap.ProtocolMessage{
+				Seq:  c.nextRequestSeq(),
+				Type: "request",
+			},
+			Command: "next",
+		},
+		Arguments: dap.NextArguments{
+			ThreadId: threadId,
+		},
+	}
+
+	if err := c.write(request); err != nil {
+		return nil, fmt.Errorf("failed to send next request: %w", err)
+	}
+
+	// Wait for next response
+	response, err := c.waitForResponse(ctx, "next")
+	if err != nil {
+		return nil, err
+	}
+
+	nextResp, ok := response.(*dap.NextResponse)
+	if !ok {
+		return nil, fmt.Errorf("unexpected response type: %T", response)
+	}
+
+	return nextResp, nil
+}
+
+// StepIn steps into the function at the current line
+// Use threadId from the stopped event
+func (c *Client) StepIn(ctx context.Context, threadId int) (*dap.StepInResponse, error) {
+	request := &dap.StepInRequest{
+		Request: dap.Request{
+			ProtocolMessage: dap.ProtocolMessage{
+				Seq:  c.nextRequestSeq(),
+				Type: "request",
+			},
+			Command: "stepIn",
+		},
+		Arguments: dap.StepInArguments{
+			ThreadId: threadId,
+		},
+	}
+
+	if err := c.write(request); err != nil {
+		return nil, fmt.Errorf("failed to send stepIn request: %w", err)
+	}
+
+	// Wait for stepIn response
+	response, err := c.waitForResponse(ctx, "stepIn")
+	if err != nil {
+		return nil, err
+	}
+
+	stepInResp, ok := response.(*dap.StepInResponse)
+	if !ok {
+		return nil, fmt.Errorf("unexpected response type: %T", response)
+	}
+
+	return stepInResp, nil
+}

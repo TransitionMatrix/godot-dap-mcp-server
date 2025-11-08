@@ -374,3 +374,47 @@ func TestTimeoutContextHelpersWithNilParent(t *testing.T) {
 		t.Error("WithConnectTimeout should set a deadline even with nil parent")
 	}
 }
+
+func TestClientSetBreakpoints_NotConnected(t *testing.T) {
+	client := NewClient("localhost", 6006)
+	ctx := context.Background()
+
+	// Should error when not connected
+	_, err := client.SetBreakpoints(ctx, "res://test.gd", []int{10})
+	if err == nil {
+		t.Error("SetBreakpoints should error when not connected")
+	}
+}
+
+func TestClientContinue_NotConnected(t *testing.T) {
+	client := NewClient("localhost", 6006)
+	ctx := context.Background()
+
+	// Should error when not connected
+	_, err := client.Continue(ctx, 1)
+	if err == nil {
+		t.Error("Continue should error when not connected")
+	}
+}
+
+func TestClientNext_NotConnected(t *testing.T) {
+	client := NewClient("localhost", 6006)
+	ctx := context.Background()
+
+	// Should error when not connected
+	_, err := client.Next(ctx, 1)
+	if err == nil {
+		t.Error("Next should error when not connected")
+	}
+}
+
+func TestClientStepIn_NotConnected(t *testing.T) {
+	client := NewClient("localhost", 6006)
+	ctx := context.Background()
+
+	// Should error when not connected
+	_, err := client.StepIn(ctx, 1)
+	if err == nil {
+		t.Error("StepIn should error when not connected")
+	}
+}

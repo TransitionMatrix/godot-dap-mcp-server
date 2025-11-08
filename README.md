@@ -1,6 +1,6 @@
 # Godot DAP MCP Server
 
-**Status**: 🚧 Active Development - Phase 2 Complete ✅ | Phase 3 In Progress ⏳
+**Status**: 🚧 Active Development - Phase 3 Complete ✅ | Phase 4 Next ⏳
 
 An MCP (Model Context Protocol) server that enables AI agents to perform interactive runtime debugging of Godot games via the Debug Adapter Protocol (DAP).
 
@@ -21,8 +21,16 @@ An MCP (Model Context Protocol) server that enables AI agents to perform interac
 - ✅ Godot-specific launch configurations
 - ✅ 12 additional unit tests (28 total)
 
-**Coming Soon** (Phase 3-8):
-- Core debugging tools: connect, breakpoints, stepping (Phase 3 - In Progress)
+**Phase 3 Complete** (2025-11-07):
+- ✅ 7 core debugging tools: connect, disconnect, breakpoints, stepping
+- ✅ Breakpoint management: set, verify, clear breakpoints
+- ✅ Execution control: continue, step over, step into
+- ✅ Global session management across tool calls
+- ✅ 15 additional unit tests (43 total)
+- ✅ Fully automated integration tests with Godot subprocess
+- ✅ Manual integration test support
+
+**Coming Soon** (Phase 4-8):
 - Runtime inspection (stack, variables, evaluation) (Phase 4)
 - Scene launching tools (Phase 5)
 - Advanced features and polish (Phase 6-8)
@@ -69,9 +77,9 @@ Comprehensive documentation is available in the `docs/` directory:
 
 ## Installation
 
-🚧 **Not yet available for end users** - Core debugging tools (Phase 3) are in development.
+🚧 **Early Access** - Core debugging tools (Phase 3) are complete and working!
 
-**Current Status**: The MCP server and DAP client infrastructure are complete. Debugging tools (connect, breakpoints, stepping) are coming in Phase 3.
+**Current Status**: You can now connect to Godot, set breakpoints, and control execution (continue, step over, step into). Runtime inspection coming in Phase 4.
 
 **For Testing/Development**:
 
@@ -79,8 +87,12 @@ Comprehensive documentation is available in the `docs/` directory:
 # Build from source
 go build -o godot-dap-mcp-server cmd/godot-dap-mcp-server/main.go
 
-# Run tests
-go test ./...  # 28 tests covering MCP and DAP layers
+# Run all tests
+go test ./...  # 43 tests covering MCP, DAP, and tools
+
+# Run integration tests (requires Godot 4.2.2+)
+./scripts/automated-integration-test.sh  # Fully automated
+./scripts/integration-test.sh            # Manual with running editor
 
 # Cross-platform builds
 ./scripts/build.sh
@@ -92,7 +104,7 @@ See [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md) for detailed build instructions and
 
 See [CLAUDE.md](CLAUDE.md) for complete development setup, architecture details, and AI-assisted development workflows.
 
-**Development Progress**: Phase 2 complete ✅ | Phase 3 in progress ⏳ - See [docs/PLAN.md](docs/PLAN.md) for detailed status
+**Development Progress**: Phase 3 complete ✅ | Phase 4 next ⏳ - See [docs/PLAN.md](docs/PLAN.md) for detailed status
 
 ### Quick Start
 
@@ -100,11 +112,14 @@ See [CLAUDE.md](CLAUDE.md) for complete development setup, architecture details,
 # Build
 go build -o godot-dap-mcp-server cmd/godot-dap-mcp-server/main.go
 
-# Run all tests (28 tests: 16 MCP + 12 DAP)
+# Run all tests (43 tests: 16 MCP + 12 DAP + 15 tools)
 go test ./...
 
 # Run with verbose output
 go test -v ./...
+
+# Run integration tests
+./scripts/automated-integration-test.sh
 
 # Format and lint
 go fmt ./... && go vet ./...
@@ -130,9 +145,11 @@ ln -sf ../../.claude/hooks/pre-commit.sh .git/hooks/pre-commit
 ```
 internal/mcp/        # MCP protocol implementation (Phase 1 ✅)
 internal/dap/        # DAP client (Phase 2 ✅)
-internal/tools/      # Godot-specific MCP tools
+internal/tools/      # Godot-specific MCP tools (Phase 3 ✅)
 cmd/                 # Entry point
 docs/                # Comprehensive documentation
+tests/               # Integration tests and fixtures
+scripts/             # Build and test automation
 .claude/             # Claude Code skills and hooks
 ```
 

@@ -136,47 +136,64 @@ This plan references detailed documentation in separate files:
 
 ---
 
-### Phase 3: Core Debugging Tools - ⏳ IN PROGRESS
+### Phase 3: Core Debugging Tools - ✅ COMPLETE
 
 **Goal**: Implement essential debugging tools using DAP client
 
-**Tools to Implement** (7 core tools):
+**Tools Implemented** (7 core tools):
 
-1. **`godot_connect`** - Establish DAP connection
+1. ✅ **`godot_connect`** - Establish DAP connection with configurationDone handshake
    - Parameters: `port` (default: 6006)
-   - Returns: Connection status, capabilities
+   - Returns: Connection status, state (configured)
+   - Location: `internal/tools/connect.go`
 
-2. **`godot_disconnect`** - Close DAP connection
+2. ✅ **`godot_disconnect`** - Close DAP connection
    - Parameters: none
    - Returns: Disconnection status
+   - Location: `internal/tools/connect.go`
 
-3. **`godot_set_breakpoint`** - Set breakpoint in GDScript file
+3. ✅ **`godot_set_breakpoint`** - Set breakpoint in GDScript file
    - Parameters: `file` (absolute path), `line` (integer)
    - Returns: Breakpoint ID, verification status
+   - Location: `internal/tools/breakpoints.go`
 
-4. **`godot_clear_breakpoint`** - Remove breakpoint
-   - Parameters: `file`, `line`
+4. ✅ **`godot_clear_breakpoint`** - Clear all breakpoints in file
+   - Parameters: `file` (absolute path)
    - Returns: Success status
+   - Location: `internal/tools/breakpoints.go`
 
-5. **`godot_continue`** - Resume execution
-   - Parameters: none
+5. ✅ **`godot_continue`** - Resume execution
+   - Parameters: none (uses threadId=1)
    - Returns: Success status
+   - Location: `internal/tools/execution.go`
 
-6. **`godot_step_over`** - Step over current line
-   - Parameters: none
+6. ✅ **`godot_step_over`** - Step over current line
+   - Parameters: none (uses threadId=1)
    - Returns: Success status
+   - Location: `internal/tools/execution.go`
 
-7. **`godot_step_into`** - Step into function
-   - Parameters: none
+7. ✅ **`godot_step_into`** - Step into function
+   - Parameters: none (uses threadId=1)
    - Returns: Success status
+   - Location: `internal/tools/execution.go`
 
 **⚠️ IMPORTANT**: `step_out` is **NOT implemented** in Godot's DAP server. See [GODOT_SOURCE_ANALYSIS.md](reference/GODOT_SOURCE_ANALYSIS.md).
 
+**Deliverables**:
+- ✅ 7 MCP tools for debugging
+- ✅ 4 new DAP client methods (SetBreakpoints, Continue, Next, StepIn)
+- ✅ Global session management via GetSession()
+- ✅ 15 unit tests (43 total with Phases 1-2)
+- ✅ Fully automated integration test with Godot subprocess
+- ✅ Manual integration test for running editor
+
 **Success Criteria**:
-- Can set breakpoints via MCP tool
-- Can control execution (continue, stepping)
-- No hangs (proper timeout protection)
-- Event filtering works for async events
+- ✅ Can set/clear breakpoints via MCP tools
+- ✅ Can control execution (continue, step over, step into)
+- ✅ No hangs (30s timeout protection on all operations)
+- ✅ Event filtering works for async DAP responses
+- ✅ Persistent MCP session via named pipes
+- ✅ All integration tests passing (6/6)
 - Clear error messages on failure
 
 **See**: [IMPLEMENTATION_GUIDE.md](IMPLEMENTATION_GUIDE.md) for tool implementation patterns
@@ -262,11 +279,21 @@ This plan references detailed documentation in separate files:
 2. **Error Message Formatting**: Problem + Context + Solution pattern
 3. **Graceful Degradation**: Handle Godot editor restart
 4. **Logging**: Structured logging with debug mode
+5. **Path Resolution Enhancement**:
+   - Add optional `project` parameter to `godot_connect`
+   - Store project root in Session for `res://` path conversion
+   - Create `ResolveGodotPath()` utility to convert `res://` → absolute paths
+   - Auto-convert paths in `godot_set_breakpoint` and `godot_clear_breakpoint`
+   - Update tool descriptions to document both path formats
+   - Add integration tests for `res://` path handling
 
 **Success Criteria**:
 - No permanent hangs (all requests timeout)
 - Helpful error messages
 - Survives Godot editor restart
+- Supports both absolute and `res://` paths transparently
+
+**Technical Note**: Godot's DAP server requires absolute paths (not a DAP protocol limitation). We convert `res://` paths client-side for better UX.
 
 **See**: [CONVENTIONS.md](reference/CONVENTIONS.md) for error message guidelines
 
@@ -297,11 +324,11 @@ This plan references detailed documentation in separate files:
 |-------|------|----------|--------|-------------|
 | 1. MCP Server Core | 1 | CRITICAL | ✅ COMPLETE | stdio server with test tool |
 | 2. DAP Client | 1-2 | CRITICAL | ✅ COMPLETE | DAP client + timeouts |
-| 3. Core Debugging Tools | 1 | HIGH | ⏳ IN PROGRESS | 7 essential tools |
+| 3. Core Debugging Tools | 1 | HIGH | ✅ COMPLETE | 7 essential tools + tests |
 | 4. Inspection Tools | 1 | HIGH | 🔲 PENDING | 5 inspection tools |
 | 5. Launch Tools | 1 | MEDIUM | 🔲 PENDING | 3 launch variants |
 | 6. Advanced Tools | 1 | OPTIONAL | 🔲 PENDING | 4 nice-to-have tools |
-| 7. Error Handling | 1 | CRITICAL | 🔲 PENDING | Timeouts, recovery |
+| 7. Error Handling | 1 | CRITICAL | 🔲 PENDING | Timeouts, recovery, paths |
 | 8. Documentation | 1 | HIGH | 🔲 PENDING | Complete docs |
 | **Total** | **4-5 days** | | | **Production-ready server** |
 

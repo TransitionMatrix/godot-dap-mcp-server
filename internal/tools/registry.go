@@ -10,10 +10,12 @@ func RegisterAll(server *mcp.Server) {
 	// Register test tool
 	RegisterPingTool(server)
 
+	// Phase 3: Core debugging tools
+	RegisterConnectionTools(server)
+	RegisterExecutionTools(server)
+	RegisterBreakpointTools(server)
+
 	// Future tools will be registered here as we implement them:
-	// RegisterConnectTool(server, dapClient)
-	// RegisterLaunchTools(server, dapClient)
-	// RegisterBreakpointTools(server, dapClient)
-	// RegisterExecutionTools(server, dapClient)
-	// RegisterInspectionTools(server, dapClient)
+	// RegisterLaunchTools(server)
+	// RegisterInspectionTools(server)
 }
