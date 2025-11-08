@@ -59,14 +59,18 @@ fi
 
 # Check if this is a significant change that might require memory sync
 significant_changes=false
+doc_changes=false
 
 # Check for changes in internal/ or cmd/ directories (excluding tests)
-if git diff --cached --name-only | grep -E "(internal/|cmd/)" | grep -v "_test.go" | wc -l | grep -v "^0" > /dev/null; then
+# Use numeric comparison instead of grep to avoid whitespace issues
+code_change_count=$(git diff --cached --name-only | grep -E "(internal/|cmd/)" | grep -v "_test.go" | wc -l | tr -d ' ')
+if [ "$code_change_count" -gt 0 ]; then
     significant_changes=true
 fi
 
 # Check for changes to documentation structure
-if git diff --cached --name-only | grep -E "(docs/.*\.md|CLAUDE\.md)" | wc -l | grep -v "^0" > /dev/null; then
+doc_change_count=$(git diff --cached --name-only | grep -E "(docs/.*\.md|CLAUDE\.md)" | wc -l | tr -d ' ')
+if [ "$doc_change_count" -gt 0 ]; then
     doc_changes=true
 fi
 
