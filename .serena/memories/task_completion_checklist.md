@@ -46,13 +46,26 @@ See `docs/DOCUMENTATION_WORKFLOW.md` for complete guidance on when and how to do
 - [ ] Update CLAUDE.md if workflow changed
 - [ ] Update relevant docs/reference/ files
 
-## 4. Conventions Check
+## 4. Memory Sync
+
+**For significant changes:**
+- [ ] Run `/memory-sync` to update project memories
+- [ ] Use `mcp__source__write_memory()` to update affected memories
+- [ ] Verify memories align with current code state
+
+**Memory sync triggers:**
+- Phase completions
+- New critical patterns discovered
+- Terminology or convention changes
+- Major refactoring (5+ files)
+
+## 5. Conventions Check
 - [ ] Tool names follow `godot_<action>_<object>` pattern
 - [ ] Error messages follow Problem + Context + Solution pattern
 - [ ] Variable/function names are clear and descriptive
 - [ ] Comments explain "why", not "what"
 
-## 5. Build Verification
+## 6. Build Verification
 ```bash
 # Verify build succeeds
 go build -o godot-dap-mcp-server cmd/godot-dap-mcp-server/main.go
@@ -61,7 +74,7 @@ go build -o godot-dap-mcp-server cmd/godot-dap-mcp-server/main.go
 ./scripts/build.sh
 ```
 
-## 6. Git Operations (if committing)
+## 7. Git Operations (if committing)
 ```bash
 # Check status
 git status
@@ -104,7 +117,7 @@ If phase involved significant debugging (3+ issue/solution cycles):
 1. Create phase-specific lessons learned document
 2. Extract patterns to implementation guide
 3. Update architecture doc with critical discoveries
-4. Run `/memory-sync` to update Serena memories
+4. Run `/memory-sync` to update project memories
 5. Commit both code and documentation changes
 
 ### For Critical Changes

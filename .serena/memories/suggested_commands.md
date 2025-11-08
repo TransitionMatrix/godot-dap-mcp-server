@@ -27,8 +27,9 @@ go test ./internal/mcp/...
 go test ./internal/dap/...
 go test ./internal/tools/...
 
-# Run integration tests (requires running Godot editor with DAP enabled)
-go test ./tests/integration/...
+# Run integration tests (requires Godot editor with DAP enabled)
+./scripts/automated-integration-test.sh  # Fully automated
+./scripts/integration-test.sh            # Manual with running editor
 
 # Test coverage
 go test -cover ./...
@@ -48,6 +49,46 @@ go vet ./...
 # Run all quality checks
 go fmt ./... && go vet ./... && go test ./...
 ```
+
+## Code Navigation (MCP Tools)
+
+Token-efficient navigation using `source` MCP server:
+
+```bash
+# Get file overview (Go files)
+mcp__source__get_symbols_overview("internal/dap/client.go")
+
+# Find specific symbol
+mcp__source__find_symbol(
+    name_path="Client/Connect",
+    relative_path="internal/dap/client.go",
+    include_body=true
+)
+
+# Navigate bash scripts
+mcp__source__get_symbols_overview("scripts/automated-integration-test.sh")
+mcp__source__find_symbol(
+    name_path="send_mcp_request",
+    relative_path="scripts/automated-integration-test.sh",
+    include_body=true
+)
+
+# Search for patterns
+mcp__source__search_for_pattern(
+    substring_pattern="ConfigurationDone",
+    paths_include_glob="**/*.go"
+)
+
+# Memory management
+mcp__source__read_memory("critical_implementation_patterns")
+mcp__source__write_memory("memory_name", "content")
+mcp__source__list_memories()
+```
+
+**Configured languages** (`.serena/project.yml`):
+- Go: Full symbolic navigation
+- Bash: Function and variable indexing
+- Markdown: Pattern search only
 
 ## Dependencies
 ```bash
