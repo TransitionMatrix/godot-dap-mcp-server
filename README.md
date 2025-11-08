@@ -73,7 +73,12 @@ Comprehensive documentation is available in the `docs/` directory:
 - **[docs/reference/GODOT_DAP_FAQ.md](docs/reference/GODOT_DAP_FAQ.md)** - Common questions and troubleshooting
 - **[docs/reference/GODOT_SOURCE_ANALYSIS.md](docs/reference/GODOT_SOURCE_ANALYSIS.md)** - Findings from Godot source analysis
 
-**For Contributors:** See [CLAUDE.md](CLAUDE.md) for AI-assisted development guidance, including Serena memory navigation and workflow tools.
+**Lessons Learned:**
+- **[docs/LESSONS_LEARNED_PHASE_3.md](docs/LESSONS_LEARNED_PHASE_3.md)** - Integration testing debugging journey
+
+**For Contributors:**
+- See [CLAUDE.md](CLAUDE.md) for AI-assisted development guidance, including Serena memory navigation and workflow tools
+- See [docs/DOCUMENTATION_WORKFLOW.md](docs/DOCUMENTATION_WORKFLOW.md) for how to document patterns and debugging insights
 
 ## Installation
 

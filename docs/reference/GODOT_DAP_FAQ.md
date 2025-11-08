@@ -33,13 +33,18 @@ Content-Length: <bytes>\r\n
 ## Initialization
 
 ### Q: What's the correct initialization sequence?
-**A**: Critical 4-step sequence:
+**A**: Critical 3-step sequence (discovered through Phase 3 debugging):
 ```
-1. initialize          → Get capabilities
-2. launch/attach       → Store params (doesn't launch yet!)
-3. setBreakpoints      → Optional
-4. configurationDone   → Actually launches game!
+1. initialize          → Get capabilities (State: Initialized)
+2. configurationDone   → Signal ready for debugging (State: Configured)
+3. setBreakpoints      → Optional, can set breakpoints now
+4. launch/attach       → Store params (doesn't launch yet!)
+5. configurationDone   → Actually launches game!
 ```
+
+**IMPORTANT**: Without step 2 (`configurationDone` after `initialize`), the session remains in "initialized" state and breakpoint commands will timeout. This is a **required step**, not optional.
+
+For full details, see [ARCHITECTURE.md - DAP Protocol Handshake Pattern](../ARCHITECTURE.md#3-dap-protocol-handshake-pattern).
 
 ### Q: Why isn't my game launching after the launch request?
 **A**: **Common mistake!** The `launch` request only *stores* the launch parameters.
@@ -278,6 +283,10 @@ Wait for response:
 - Windows: Uppercase drive letter (e.g., `C:/project/script.gd`)
 - Match editor's project directory exactly
 
+**Note**: `res://` paths are NOT supported in DAP protocol. Godot requires absolute filesystem paths for all file references (breakpoints, source files, etc.). This is a **Godot limitation**, not a DAP protocol limitation.
+
+For MCP servers bridging to Godot DAP, you'll need to convert `res://` paths to absolute paths. See planned enhancement in [PLAN.md - Phase 7](../PLAN.md).
+
 ### Q: Why are Windows paths failing?
 **A**: Godot auto-converts but validation runs first
 - Convert before sending: `c:\path` → `C:/path`
@@ -366,6 +375,47 @@ Wait for response:
 
 ---
 
+---
+
+## MCP Bridge Considerations
+
+### Q: How do I maintain session state across MCP tool calls?
+**A**: MCP servers must use a persistent process, not per-request spawning:
+
+**Problem**: Each MCP tool call (e.g., `godot_connect`, `godot_set_breakpoint`) needs to share the same DAP session.
+
+**Solution**: Use named pipes with file descriptors to maintain persistent stdin/stdout:
+```bash
+mkfifo /tmp/mcp-stdin /tmp/mcp-stdout
+exec 3<>/tmp/mcp-stdin
+exec 4<>/tmp/mcp-stdout
+./godot-dap-mcp-server </tmp/mcp-stdin >/tmp/mcp-stdout &
+```
+
+Without persistent pipes, each tool call spawns a new server process and loses the DAP session. See [IMPLEMENTATION_GUIDE.md - Integration Testing Patterns](../IMPLEMENTATION_GUIDE.md#integration-testing-patterns) for details.
+
+### Q: How do I parse MCP responses with nested JSON?
+**A**: MCP wraps tool results, causing escaped quotes:
+
+```json
+{
+  "result": {
+    "content": [{
+      "text": "{\\\"status\\\":\\\"connected\\\"}"
+    }]
+  }
+}
+```
+
+Use regex that handles both escaped and unescaped:
+```bash
+grep -qE '(\\"|")status(\\"|"):(\\"|")connected'
+```
+
+See [IMPLEMENTATION_GUIDE.md - Robust JSON Parsing](../IMPLEMENTATION_GUIDE.md#pattern-robust-json-parsing-in-bash) for complete pattern.
+
+---
+
 ## Additional Resources
 
 For more detailed information, consult the Godot Engine source code:
@@ -375,3 +425,5 @@ For more detailed information, consult the Godot Engine source code:
 - `editor/debugger/debug_adapter/debug_adapter_types.h` - Type definitions
 
 Or reference the DAP specification: https://microsoft.github.io/debug-adapter-protocol/
+
+**For debugging insights**: See [LESSONS_LEARNED_PHASE_3.md](../LESSONS_LEARNED_PHASE_3.md) for the complete Phase 3 debugging journey.

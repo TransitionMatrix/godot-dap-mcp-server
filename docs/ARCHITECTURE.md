@@ -365,7 +365,52 @@ return c.waitForResponse(ctx, "launch")
 - Clear timeout error messages
 - Goroutine + select pattern for cancellation
 
-### 3. Godot Launch Flow Pattern
+### 3. DAP Protocol Handshake Pattern
+
+**Problem**: Complete DAP initialization requires multiple steps. Missing `configurationDone` leaves session in "initialized" state, where breakpoint commands timeout.
+
+**Solution**: Three-step handshake sequence:
+
+```go
+// Step 1: Initialize - Get server capabilities
+if err := session.Initialize(ctx); err != nil {
+    return fmt.Errorf("failed to initialize DAP session: %w", err)
+}
+// State: StateInitialized (NOT ready for debugging commands yet!)
+
+// Step 2: ConfigurationDone - Signal "ready for debugging"
+if err := session.ConfigurationDone(ctx); err != nil {
+    return fmt.Errorf("failed to complete DAP configuration: %w", err)
+}
+// State: StateConfigured (NOW ready for breakpoints, launch, etc.)
+
+// Step 3: Launch (optional) - Start game instance
+if err := session.Launch(ctx, launchArgs); err != nil {
+    return fmt.Errorf("failed to launch: %w", err)
+}
+// State: StateLaunched (game running)
+```
+
+**Critical Discovery** (Phase 3 debugging):
+- Without `ConfigurationDone()`, session remains in "initialized" state
+- Breakpoint commands sent before `ConfigurationDone()` will timeout
+- This is a **required step**, not optional
+- State transition: `Initialized` → `Configured` → ready for debugging
+
+**State Machine**:
+```
+Disconnected → Connect() → Connected
+            ↓
+         Initialize() → Initialized (can't set breakpoints yet!)
+            ↓
+      ConfigurationDone() → Configured (ready for breakpoints/launch)
+            ↓
+          Launch() → Launched (game running)
+```
+
+For full debugging story, see [LESSONS_LEARNED_PHASE_3.md](LESSONS_LEARNED_PHASE_3.md#issue-2-dap-protocol-handshake-incomplete).
+
+### 4. Godot Launch Flow Pattern
 
 **Problem**: Godot requires a specific sequence to launch games via DAP.
 
@@ -389,7 +434,7 @@ c.waitForResponse(ctx, "configurationDone")
 
 **Critical**: The `launch` request only *stores* parameters. Must send `configurationDone` to actually start the game.
 
-### 4. Session State Machine Pattern
+### 5. Session State Machine Pattern
 
 **Problem**: DAP operations have dependencies (must connect before launching, etc.).
 

@@ -1063,9 +1063,165 @@ Solutions:
 
 ---
 
+---
+
+## Integration Testing Patterns
+
+These patterns were discovered while implementing Phase 3 integration tests. For the full debugging story, see [LESSONS_LEARNED_PHASE_3.md](LESSONS_LEARNED_PHASE_3.md).
+
+### Pattern: Persistent Subprocess Communication
+
+When testing MCP servers, you need to maintain a persistent server process across multiple tool calls (for session state). Use named pipes with file descriptors:
+
+```bash
+#!/bin/bash
+
+# 1. Create named pipes
+rm -f /tmp/mcp-stdin /tmp/mcp-stdout
+mkfifo /tmp/mcp-stdin /tmp/mcp-stdout
+
+# 2. Open file descriptors (keeps pipes alive)
+exec 3<>/tmp/mcp-stdin
+exec 4<>/tmp/mcp-stdout
+
+# 3. Start subprocess with pipes
+./godot-dap-mcp-server </tmp/mcp-stdin >/tmp/mcp-stdout 2>/dev/null &
+SERVER_PID=$!
+
+# 4. Setup cleanup trap
+trap "exec 3>&- 4>&-; kill $SERVER_PID 2>/dev/null; rm -f /tmp/mcp-stdin /tmp/mcp-stdout" EXIT
+
+# 5. Communication function
+send_mcp_request() {
+    local request="$1"
+    echo "$request" >&3  # Write to FD 3
+    read -r response <&4  # Read from FD 4
+    echo "$response"
+}
+
+# 6. Use it
+RESPONSE=$(send_mcp_request '{"jsonrpc":"2.0","id":1,"method":"tools/list"}')
+```
+
+**Why This Works:**
+- File descriptors (FD 3, 4) keep pipes open even after individual writes
+- Server's stdin never sees EOF
+- Session persists across all tool calls
+- Clean shutdown via trap
+
+**When to Use:**
+- Testing MCP servers with session state (like `globalSession`)
+- Any subprocess that needs to maintain state across requests
+- Request/response protocols over stdin/stdout
+
+**Common Mistake:**
+```bash
+# ❌ WRONG - Pipe closes after each write
+echo "$data" > /tmp/pipe
+
+# ✅ RIGHT - Use file descriptors
+exec 3<>/tmp/pipe
+echo "$data" >&3
+```
+
+### Pattern: Port Conflict Handling
+
+Development tools often run multiple instances. Use graceful port fallback:
+
+```bash
+# Check if port is in use
+is_port_in_use() {
+    nc -z 127.0.0.1 $1 2>/dev/null
+}
+
+# Find available port in range
+find_available_port() {
+    local start=$1
+    local end=$2
+    for port in $(seq $start $end); do
+        if ! is_port_in_use $port; then
+            echo $port
+            return 0
+        fi
+    done
+    return 1
+}
+
+# Use with fallback
+DEFAULT_PORT=6006
+if is_port_in_use $DEFAULT_PORT; then
+    PORT=$(find_available_port 6006 6020)
+    if [ -z "$PORT" ]; then
+        echo "Error: No available ports in range 6006-6020"
+        exit 1
+    fi
+    echo "Port $DEFAULT_PORT in use, using $PORT instead"
+else
+    PORT=$DEFAULT_PORT
+fi
+
+echo "Using port: $PORT"
+```
+
+**When to Use:**
+- Development tools with default ports
+- CI/CD environments where port conflicts are common
+- Any networked service that may have multiple instances
+
+### Pattern: Robust JSON Parsing in Bash
+
+MCP wraps tool results in nested JSON, causing escaped quotes. Use regex that handles both:
+
+```bash
+# Match both escaped and unescaped JSON
+PATTERN='(\\"|")status(\\"|"):(\\"|")connected'
+
+if echo "$RESPONSE" | grep -qE "$PATTERN"; then
+    echo "Connection successful!"
+fi
+
+# Extract values (handles escaped quotes)
+extract_status() {
+    local response="$1"
+    echo "$response" | grep -oE '(\\"|")status(\\"|"):(\\"|")[^"\\]*' |
+        sed 's/.*://' | tr -d '"\\'
+}
+
+STATUS=$(extract_status "$RESPONSE")
+```
+
+**Why This Is Needed:**
+
+MCP protocol wraps tool results in nested JSON:
+```json
+{
+  "jsonrpc": "2.0",
+  "id": 3,
+  "result": {
+    "content": [{
+      "type": "text",
+      "text": "{\\\"status\\\":\\\"connected\\\"}"  // Escaped JSON string
+    }]
+  }
+}
+```
+
+**Pattern Breakdown:**
+- `(\\"|")` - Matches either `\"` (escaped) or `"` (unescaped)
+- Applied to both key and value quotes
+- Works with MCP's nested JSON structure
+
+**When to Use:**
+- Parsing MCP tool results in shell scripts
+- Any situation where JSON might be escaped in a string
+- Integration tests that parse structured responses
+
+---
+
 ## References
 
 - [ARCHITECTURE.md](ARCHITECTURE.md) - System architecture and design decisions
 - [GODOT_DAP_FAQ.md](reference/GODOT_DAP_FAQ.md) - Common troubleshooting questions
 - [DAP_PROTOCOL.md](reference/DAP_PROTOCOL.md) - Detailed protocol specifications
 - [CONVENTIONS.md](reference/CONVENTIONS.md) - Naming and coding conventions
+- [LESSONS_LEARNED_PHASE_3.md](LESSONS_LEARNED_PHASE_3.md) - Phase 3 debugging case study
