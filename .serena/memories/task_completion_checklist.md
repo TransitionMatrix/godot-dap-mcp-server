@@ -16,6 +16,10 @@ go vet ./...
 # Run all tests
 go test ./...
 
+# Integration tests (requires Godot 4.2.2+)
+./scripts/automated-integration-test.sh  # Fully automated
+./scripts/integration-test.sh            # Manual with running editor
+
 # For new features, ensure:
 # - Unit tests written for new code
 # - Tests cover main success paths
@@ -24,10 +28,23 @@ go test ./...
 ```
 
 ## 3. Documentation
-- [ ] Update CLAUDE.md if architecture changed
-- [ ] Update relevant docs/reference/ files if needed
-- [ ] Add/update code comments for complex logic
+
+**For all changes:**
+- [ ] Update code comments for complex logic
 - [ ] Update PLAN.md if phase status changed
+
+**For phase completions with significant debugging:**
+- [ ] Create `docs/LESSONS_LEARNED_PHASE_N.md` with debugging narrative
+- [ ] Extract reusable patterns to `docs/IMPLEMENTATION_GUIDE.md`
+- [ ] Add critical patterns to `docs/ARCHITECTURE.md`
+- [ ] Add Q&A entries to `docs/reference/GODOT_DAP_FAQ.md`
+- [ ] Add cross-references between documents
+
+See `docs/DOCUMENTATION_WORKFLOW.md` for complete guidance on when and how to document lessons learned.
+
+**For architecture/convention changes:**
+- [ ] Update CLAUDE.md if workflow changed
+- [ ] Update relevant docs/reference/ files
 
 ## 4. Conventions Check
 - [ ] Tool names follow `godot_<action>_<object>` pattern
@@ -56,8 +73,9 @@ git add <files>
 git commit -m "<type>: <subject>"
 # Types: feat, fix, docs, test, refactor, perf, chore
 
-# Push if appropriate
-git push origin main
+# Pre-commit hook runs:
+# - gitleaks (secret detection)
+# - Memory sync reminder (if internal/ or cmd/ changed)
 ```
 
 ## Quick Command Sequence
@@ -77,8 +95,17 @@ go fmt ./... && go vet ./... && go test ./... && go build -o godot-dap-mcp-serve
 ### For DAP Client Code
 - Timeout protection added (use context.Context)
 - Event filtering implemented (async events mixed with responses)
+- ConfigurationDone called after Initialize (critical!)
 - Error messages follow Problem + Context + Solution pattern
 - Session state properly managed
+
+### For Phase Completions
+If phase involved significant debugging (3+ issue/solution cycles):
+1. Create phase-specific lessons learned document
+2. Extract patterns to implementation guide
+3. Update architecture doc with critical discoveries
+4. Run `/memory-sync` to update Serena memories
+5. Commit both code and documentation changes
 
 ### For Critical Changes
 - Update docs/ARCHITECTURE.md if design patterns change

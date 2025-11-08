@@ -2,7 +2,38 @@
 
 These are essential patterns discovered through testing and implementation. Following these patterns is critical for correctness.
 
-## 1. Event Filtering Pattern (DAP Client)
+## 1. DAP Protocol Handshake Pattern
+
+**Problem**: Missing `ConfigurationDone()` leaves session in "initialized" state where breakpoint commands timeout.
+
+**Solution**: Complete 3-step handshake (Phase 3 discovery)
+```go
+// Step 1: Initialize - Get server capabilities
+if err := session.Initialize(ctx); err != nil {
+    return fmt.Errorf("failed to initialize: %w", err)
+}
+// State: Initialized (NOT ready for debugging yet!)
+
+// Step 2: ConfigurationDone - Signal "ready for debugging"
+if err := session.ConfigurationDone(ctx); err != nil {
+    return fmt.Errorf("failed to complete configuration: %w", err)
+}
+// State: Configured (NOW ready for breakpoints, launch, etc.)
+
+// Step 3: Launch (optional) - Start game instance
+if err := session.Launch(ctx, launchArgs); err != nil {
+    return fmt.Errorf("failed to launch: %w", err)
+}
+// State: Launched (game running)
+```
+
+**Key Points**:
+- `ConfigurationDone()` is **required**, not optional
+- Without it, session stays in "initialized" state
+- Breakpoints set before `ConfigurationDone()` will timeout
+- State transitions: Disconnected → Connected → Initialized → Configured → Launched
+
+## 2. Event Filtering Pattern (DAP Client)
 
 **Problem**: Godot's DAP server sends async events (stopped, continued, output, etc.) mixed with command responses. Reading without filtering will return events instead of expected responses.
 
@@ -38,7 +69,7 @@ func (c *Client) waitForResponse(ctx context.Context, expectedCommand string) (*
 - Log events but don't treat them as responses
 - Use timeouts to prevent infinite loops
 
-## 2. Timeout Protection Pattern
+## 3. Timeout Protection Pattern
 
 **Problem**: DAP server may hang or not respond to certain requests, causing permanent blocking.
 
@@ -67,39 +98,34 @@ func (t *Tool) Execute(args map[string]interface{}) (interface{}, error) {
 - Step operations: 15 seconds (may hit breakpoint)
 - Read operations: 5 seconds (should be fast)
 
-## 3. Godot Launch Flow Pattern
+## 4. Persistent MCP Session Pattern (Integration Testing)
 
-**Problem**: Godot requires specific sequence to launch game for debugging.
+**Problem**: MCP tools need to share DAP session across multiple tool calls. Spawning new server per request loses session.
 
-**Solution**: Follow exact initialization sequence
-```go
-// 1. Initialize DAP connection
-err := client.Initialize(ctx)
+**Solution**: File descriptors with named pipes (Phase 3 discovery)
+```bash
+# Create named pipes
+mkfifo /tmp/mcp-stdin /tmp/mcp-stdout
 
-// 2. Send launch request with arguments
-err = client.Launch(ctx, LaunchConfig{
-    Mode:    "launch",
-    Request: "launch",
-    Project: "/absolute/path/to/project",
-    Scene:   "main",  // or "current" or "res://path/to/scene.tscn"
-    // Optional:
-    Platform:     "host",
-    BreakOnStart: false,
-})
+# Open FDs to keep pipes alive
+exec 3<>/tmp/mcp-stdin
+exec 4<>/tmp/mcp-stdout
 
-// 3. Send configurationDone to trigger actual launch
-err = client.ConfigurationDone(ctx)
+# Start MCP server (pipes stay open because FDs are open)
+./godot-dap-mcp-server </tmp/mcp-stdin >/tmp/mcp-stdout &
 
-// Game is now running until breakpoint/pause/exit
+# Send requests via FD 3, read responses via FD 4
+echo "$request" >&3
+read -r response <&4
 ```
 
 **Key Points**:
-- Must call initialize before launch
-- Must call configurationDone after launch
-- Project path must be absolute and contain project.godot
-- Scene modes: "main", "current", or explicit path
+- File descriptors keep pipes open between writes
+- Server stdin never sees EOF
+- Session persists across all tool calls
+- Clean shutdown via `exec 3>&- 4>&-` in trap
 
-## 4. Error Message Pattern
+## 5. Error Message Pattern
 
 **Pattern**: Problem + Context + Solution
 
@@ -123,58 +149,27 @@ Solutions:
 }
 ```
 
-**Key Points**:
-- State the problem clearly
-- List 2-4 possible causes
-- Provide concrete solutions
-- Include relevant paths/values
+## 6. Global Session Management
 
-## 5. Session State Management
+**Pattern**: Single `globalSession` variable shared across tool calls
 
-**Problem**: Only one DAP session can be active at a time. Must track connection and session state.
-
-**Solution**: Centralized session state
 ```go
-type Session struct {
-    client      *Client
-    connected   bool
-    initialized bool
-    launched    bool
-    mu          sync.RWMutex
-}
+var globalSession *dap.Session
 
-func (s *Session) RequireConnected() error {
-    s.mu.RLock()
-    defer s.mu.RUnlock()
-    
-    if !s.connected {
-        return fmt.Errorf("not connected to Godot DAP server")
+func GetSession() (*dap.Session, error) {
+    if globalSession == nil {
+        return nil, fmt.Errorf("not connected - call godot_connect first")
     }
-    return nil
-}
-
-func (s *Session) RequireLaunched() error {
-    if err := s.RequireConnected(); err != nil {
-        return err
-    }
-    
-    s.mu.RLock()
-    defer s.mu.RUnlock()
-    
-    if !s.launched {
-        return fmt.Errorf("game not launched - use godot_launch_* first")
-    }
-    return nil
+    return globalSession, nil
 }
 ```
 
 **Key Points**:
-- Protect state with mutex
-- Validate state before operations
-- Clear error messages about required state
-- Single active session at a time
+- One debugging session at a time
+- Tools use `GetSession()` to access shared session
+- Clear error if not connected
 
-## 6. Known Issues and Workarounds
+## 7. Known Issues and Workarounds
 
 ### stepOut Not Implemented
 ```go
@@ -185,61 +180,13 @@ err := client.StepOut(ctx)
 err := client.Continue(ctx)
 ```
 
-### Breakpoint Verification
+### Absolute Paths Required
 ```go
-// Always check if breakpoint was verified by Godot
-response, err := client.SetBreakpoints(ctx, file, lines)
-for _, bp := range response.Breakpoints {
-    if !bp.Verified {
-        log.Printf("Warning: breakpoint at line %d not verified", bp.Line)
-    }
-}
+// ❌ res:// paths not supported by Godot DAP
+file := "res://scripts/player.gd"
+
+// ✅ Use absolute paths
+file := "/absolute/path/to/project/scripts/player.gd"
 ```
 
-### Path Handling
-```go
-// Always use absolute paths for Godot
-projectPath, err := filepath.Abs(relativePath)
-scriptPath := filepath.Join(projectPath, "scripts/player.gd")
-```
-
-## 7. Tool Registration Pattern
-
-```go
-func RegisterTools(server *mcp.Server, session *dap.Session) {
-    server.RegisterTool(&mcp.Tool{
-        Name:        "godot_set_breakpoint",
-        Description: `[AI-optimized description with prerequisites, use cases, examples]`,
-        InputSchema: map[string]interface{}{
-            "type": "object",
-            "properties": map[string]interface{}{
-                "file": map[string]interface{}{
-                    "type":        "string",
-                    "description": "Absolute path to script file",
-                },
-                "line": map[string]interface{}{
-                    "type":        "integer",
-                    "description": "Line number (1-indexed)",
-                },
-            },
-            "required": []string{"file", "line"},
-        },
-        Handler: func(args map[string]interface{}) (interface{}, error) {
-            // Validate session state
-            if err := session.RequireLaunched(); err != nil {
-                return nil, err
-            }
-            
-            // Extract and validate parameters
-            file, _ := args["file"].(string)
-            line, _ := args["line"].(float64)  // JSON numbers are float64
-            
-            // Execute with timeout
-            ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-            defer cancel()
-            
-            return session.Client.SetBreakpoint(ctx, file, int(line))
-        },
-    })
-}
-```
+For complete debugging stories, see `docs/LESSONS_LEARNED_PHASE_3.md`.
