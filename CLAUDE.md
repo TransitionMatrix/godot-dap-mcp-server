@@ -30,7 +30,7 @@ The following Claude Code skills are available for this project:
 ### memory-sync
 **Location:** `.claude/skills/memory-sync/`
 
-**Purpose:** Guided workflow for maintaining strategic redundancy between Serena memories and project documentation:
+**Purpose:** Guided workflow for maintaining strategic redundancy between project memories and documentation:
 - Assess what changed since last sync
 - Update memories with concise summaries
 - Flag documentation that needs comprehensive updates
@@ -59,9 +59,18 @@ Comprehensive documentation is organized into focused documents:
 
 ## Code Navigation and Memory Management
 
-### Using Serena for Code Exploration
+### Using the Source MCP Servers
 
-This project uses **Serena** (MCP server) for token-efficient code navigation. When exploring code:
+This project uses two symbolic code navigation MCP servers for token-efficient code exploration:
+
+**MCP Servers:**
+- `source` (tools: `mcp__source__*`) - Navigate this project's Go/Bash codebase
+- `godot-source` (tools: `mcp__godot-source__*`) - Navigate Godot engine C++ source code
+
+**Configured Languages** (`.serena/project.yml`):
+- **Go** (`.go`) - Full LSP support with symbolic navigation
+- **Bash** (`.sh`) - Functions and variables indexed
+- **Markdown** (`.md`) - Pattern search only (no symbols)
 
 **Prefer symbolic tools over reading entire files:**
 - Use `get_symbols_overview` to understand file structure before reading
@@ -80,11 +89,15 @@ find_symbol(name_path="Client", depth=1, include_body=false)
 
 # 3. Read only needed method
 find_symbol(name_path="Client/Connect", include_body=true)
+
+# 4. Navigate bash scripts symbolically
+get_symbols_overview(relative_path="scripts/automated-integration-test.sh")
+find_symbol(name_path="send_mcp_request", include_body=true)
 ```
 
 ### Project Memories (Strategic Redundancy)
 
-Project knowledge is stored in Serena memory files (`.serena/memories/`):
+Project knowledge is stored in memory files (`.serena/memories/`) managed by the `source` MCP server:
 - **project_overview.md** - Architecture, purpose, implementation status
 - **tech_stack.md** - Dependencies and build system
 - **code_style_and_conventions.md** - Naming patterns and error handling
@@ -95,11 +108,12 @@ Project knowledge is stored in Serena memory files (`.serena/memories/`):
 
 **Memory vs Documentation Strategy:**
 
-**Serena Memories** - Quick context for code navigation (token-efficient)
+**Project Memories** (`.serena/memories/`) - Quick context for code navigation (token-efficient)
 - Updated frequently as code evolves
 - Concise summaries (1-2 pages max)
 - What you need to know before exploring code
 - Reflects current code reality
+- Accessed via `mcp__source__read_memory()`, `mcp__source__write_memory()`
 
 **Documentation** (`docs/`) - Comprehensive reference for humans
 - Stable, version-controlled knowledge
