@@ -329,3 +329,175 @@ func (c *Client) StepIn(ctx context.Context, threadId int) (*dap.StepInResponse,
 
 	return stepInResp, nil
 }
+
+// Threads requests the list of active threads.
+// Godot always returns a single thread with ID 1 named "Main".
+func (c *Client) Threads(ctx context.Context) (*dap.ThreadsResponse, error) {
+	request := &dap.ThreadsRequest{
+		Request: dap.Request{
+			ProtocolMessage: dap.ProtocolMessage{
+				Seq:  c.nextRequestSeq(),
+				Type: "request",
+			},
+			Command: "threads",
+		},
+	}
+
+	if err := c.write(request); err != nil {
+		return nil, fmt.Errorf("failed to send threads request: %w", err)
+	}
+
+	// Wait for threads response
+	response, err := c.waitForResponse(ctx, "threads")
+	if err != nil {
+		return nil, err
+	}
+
+	threadsResp, ok := response.(*dap.ThreadsResponse)
+	if !ok {
+		return nil, fmt.Errorf("unexpected response type: %T", response)
+	}
+
+	return threadsResp, nil
+}
+
+// StackTrace requests the call stack for the specified thread.
+// Returns stack frames with source file paths, line numbers, and frame IDs.
+func (c *Client) StackTrace(ctx context.Context, threadId int, startFrame int, levels int) (*dap.StackTraceResponse, error) {
+	request := &dap.StackTraceRequest{
+		Request: dap.Request{
+			ProtocolMessage: dap.ProtocolMessage{
+				Seq:  c.nextRequestSeq(),
+				Type: "request",
+			},
+			Command: "stackTrace",
+		},
+		Arguments: dap.StackTraceArguments{
+			ThreadId:   threadId,
+			StartFrame: startFrame,
+			Levels:     levels,
+		},
+	}
+
+	if err := c.write(request); err != nil {
+		return nil, fmt.Errorf("failed to send stackTrace request: %w", err)
+	}
+
+	// Wait for stackTrace response
+	response, err := c.waitForResponse(ctx, "stackTrace")
+	if err != nil {
+		return nil, err
+	}
+
+	stackResp, ok := response.(*dap.StackTraceResponse)
+	if !ok {
+		return nil, fmt.Errorf("unexpected response type: %T", response)
+	}
+
+	return stackResp, nil
+}
+
+// Scopes requests the variable scopes for the specified stack frame.
+// Returns Locals, Members, and Globals scopes with variablesReference IDs.
+func (c *Client) Scopes(ctx context.Context, frameId int) (*dap.ScopesResponse, error) {
+	request := &dap.ScopesRequest{
+		Request: dap.Request{
+			ProtocolMessage: dap.ProtocolMessage{
+				Seq:  c.nextRequestSeq(),
+				Type: "request",
+			},
+			Command: "scopes",
+		},
+		Arguments: dap.ScopesArguments{
+			FrameId: frameId,
+		},
+	}
+
+	if err := c.write(request); err != nil {
+		return nil, fmt.Errorf("failed to send scopes request: %w", err)
+	}
+
+	// Wait for scopes response
+	response, err := c.waitForResponse(ctx, "scopes")
+	if err != nil {
+		return nil, err
+	}
+
+	scopesResp, ok := response.(*dap.ScopesResponse)
+	if !ok {
+		return nil, fmt.Errorf("unexpected response type: %T", response)
+	}
+
+	return scopesResp, nil
+}
+
+// Variables requests the variables in the specified scope or expands a complex variable.
+// Use variablesReference from scopes response or from a variable with variablesReference > 0.
+func (c *Client) Variables(ctx context.Context, variablesReference int) (*dap.VariablesResponse, error) {
+	request := &dap.VariablesRequest{
+		Request: dap.Request{
+			ProtocolMessage: dap.ProtocolMessage{
+				Seq:  c.nextRequestSeq(),
+				Type: "request",
+			},
+			Command: "variables",
+		},
+		Arguments: dap.VariablesArguments{
+			VariablesReference: variablesReference,
+		},
+	}
+
+	if err := c.write(request); err != nil {
+		return nil, fmt.Errorf("failed to send variables request: %w", err)
+	}
+
+	// Wait for variables response
+	response, err := c.waitForResponse(ctx, "variables")
+	if err != nil {
+		return nil, err
+	}
+
+	varsResp, ok := response.(*dap.VariablesResponse)
+	if !ok {
+		return nil, fmt.Errorf("unexpected response type: %T", response)
+	}
+
+	return varsResp, nil
+}
+
+// Evaluate evaluates the specified expression in the context of the specified stack frame.
+// Returns the result value, type, and variablesReference (if result is complex).
+// Context can be "watch", "repl", or "hover" to indicate the evaluation context.
+func (c *Client) Evaluate(ctx context.Context, expression string, frameId int, context string) (*dap.EvaluateResponse, error) {
+	request := &dap.EvaluateRequest{
+		Request: dap.Request{
+			ProtocolMessage: dap.ProtocolMessage{
+				Seq:  c.nextRequestSeq(),
+				Type: "request",
+			},
+			Command: "evaluate",
+		},
+		Arguments: dap.EvaluateArguments{
+			Expression: expression,
+			FrameId:    frameId,
+			Context:    context,
+		},
+	}
+
+	if err := c.write(request); err != nil {
+		return nil, fmt.Errorf("failed to send evaluate request: %w", err)
+	}
+
+	// Wait for evaluate response
+	response, err := c.waitForResponse(ctx, "evaluate")
+	if err != nil {
+		return nil, err
+	}
+
+	evalResp, ok := response.(*dap.EvaluateResponse)
+	if !ok {
+		return nil, fmt.Errorf("unexpected response type: %T", response)
+	}
+
+	return evalResp, nil
+}

@@ -418,3 +418,58 @@ func TestClientStepIn_NotConnected(t *testing.T) {
 		t.Error("StepIn should error when not connected")
 	}
 }
+
+func TestClientThreads_NotConnected(t *testing.T) {
+	client := NewClient("localhost", 6006)
+	ctx := context.Background()
+
+	// Should error when not connected
+	_, err := client.Threads(ctx)
+	if err == nil {
+		t.Error("Threads should error when not connected")
+	}
+}
+
+func TestClientStackTrace_NotConnected(t *testing.T) {
+	client := NewClient("localhost", 6006)
+	ctx := context.Background()
+
+	// Should error when not connected
+	_, err := client.StackTrace(ctx, 1, 0, 20)
+	if err == nil {
+		t.Error("StackTrace should error when not connected")
+	}
+}
+
+func TestClientScopes_NotConnected(t *testing.T) {
+	client := NewClient("localhost", 6006)
+	ctx := context.Background()
+
+	// Should error when not connected
+	_, err := client.Scopes(ctx, 1)
+	if err == nil {
+		t.Error("Scopes should error when not connected")
+	}
+}
+
+func TestClientVariables_NotConnected(t *testing.T) {
+	client := NewClient("localhost", 6006)
+	ctx := context.Background()
+
+	// Should error when not connected
+	_, err := client.Variables(ctx, 1000)
+	if err == nil {
+		t.Error("Variables should error when not connected")
+	}
+}
+
+func TestClientEvaluate_NotConnected(t *testing.T) {
+	client := NewClient("localhost", 6006)
+	ctx := context.Background()
+
+	// Should error when not connected
+	_, err := client.Evaluate(ctx, "1 + 1", 0, "repl")
+	if err == nil {
+		t.Error("Evaluate should error when not connected")
+	}
+}

@@ -1,7 +1,7 @@
 # Godot DAP MCP Server - Implementation Plan
 
 **Date**: 2025-11-05
-**Last Updated**: 2025-11-07
+**Last Updated**: 2025-11-08
 **Language**: Go
 **Purpose**: MCP server providing interactive runtime debugging for Godot games via DAP protocol
 
@@ -26,8 +26,19 @@
   - Session management and Godot-specific launch configs
   - Commit: `3079ee8`
 
-- ⏳ **Phase 3: Core Debugging Tools** - IN PROGRESS
-- 🔲 **Phase 4: Inspection Tools** - PENDING
+- ✅ **Phase 3: Core Debugging Tools** - COMPLETE (2025-11-07)
+  - All 7 core debugging tools implemented
+  - 43 unit tests passing
+  - Integration tests working with automated Godot launch
+  - Session management and event filtering patterns established
+
+- ✅ **Phase 4: Runtime Inspection Tools** - COMPLETE (2025-11-08)
+  - All 5 inspection tools implemented
+  - 61 unit tests passing (including 11 formatting tests)
+  - Stack traces, scopes, variables, and expression evaluation working
+  - Godot-specific type formatting (Vector2/3, Color, Nodes, Arrays, etc.)
+  - Integration test verifies all tools registered
+
 - 🔲 **Phase 5: Launch Tools** - PENDING
 - 🔲 **Phase 6: Advanced Tools** - PENDING
 - 🔲 **Phase 7: Error Handling & Polish** - PENDING
@@ -200,28 +211,45 @@ This plan references detailed documentation in separate files:
 
 ---
 
-### Phase 4: Inspection Tools - 🔲 PENDING
+### Phase 4: Inspection Tools - ✅ COMPLETE
 
 **Goal**: Implement runtime inspection tools
 
-**Tools to Implement** (5 tools):
-1. `godot_get_stack_trace`
-2. `godot_get_scopes`
-3. `godot_get_variables`
-4. `godot_evaluate`
-5. `godot_get_threads`
+**Tools Implemented** (5 tools):
+1. ✅ `godot_get_threads` - Get active threads (always returns thread ID 1)
+2. ✅ `godot_get_stack_trace` - Get call stack with frame IDs
+3. ✅ `godot_get_scopes` - Get variable scopes (Locals, Members, Globals)
+4. ✅ `godot_get_variables` - Get variables in scope or expand complex objects
+5. ✅ `godot_evaluate` - Evaluate GDScript expressions in context
 
-**Godot-Specific Enhancements**:
-- Pretty-print Node objects
-- Format Vector2/Vector3 nicely
-- Show scene tree paths
-- Handle GDScript null vs. empty string
+**Implementation Details**:
+- Added 5 DAP client methods: `Threads()`, `StackTrace()`, `Scopes()`, `Variables()`, `Evaluate()`
+- Created `internal/tools/inspection.go` with 5 MCP tools
+- All tools follow event filtering and timeout protection patterns
+- Variables marked as expandable when `variablesReference > 0`
+
+**Testing**:
+- 61 passing unit tests (up from 43 in Phase 3)
+- Integration test verifies all 5 tools registered
+- Tool descriptions AI-optimized with prerequisites, use cases, examples
+- Comprehensive formatting tests for 15+ Godot types
+
+**Godot-Specific Formatting** (Polish):
+- ✅ Vector2/3/4 - `Vector2(x=10, y=20)`
+- ✅ Color - `Color(r=1.0, g=0.5, b=0.0, a=1.0)`
+- ✅ Rect2, AABB - Bounding boxes with pos/size labels
+- ✅ Transform2D/3D, Basis - Simplified representations
+- ✅ Node types - Class name with instance ID
+- ✅ Arrays - Element count with preview
+- ✅ Dictionaries - Key count hints
 
 **Success Criteria**:
-- Can inspect call stack at breakpoint
-- Can view variable values in all scopes
-- Can evaluate GDScript expressions
-- Godot objects formatted nicely
+- ✅ Can inspect call stack at breakpoint
+- ✅ Can view variable values in all scopes (Locals, Members, Globals)
+- ✅ Can evaluate GDScript expressions
+- ✅ Godot objects formatted nicely with semantic labels
+
+**Completion Date**: 2025-11-08
 
 ---
 

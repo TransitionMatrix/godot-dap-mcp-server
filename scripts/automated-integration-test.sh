@@ -218,13 +218,26 @@ else
     exit 1
 fi
 
-# Check for all Phase 3 tools
-EXPECTED_TOOLS=("godot_connect" "godot_disconnect" "godot_continue" "godot_step_over" "godot_step_into" "godot_set_breakpoint" "godot_clear_breakpoint")
-for tool in "${EXPECTED_TOOLS[@]}"; do
+# Check for Phase 3 tools (Core Debugging)
+PHASE3_TOOLS=("godot_connect" "godot_disconnect" "godot_continue" "godot_step_over" "godot_step_into" "godot_set_breakpoint" "godot_clear_breakpoint")
+echo "  Phase 3 (Core Debugging):"
+for tool in "${PHASE3_TOOLS[@]}"; do
     if echo "$TOOLS_RESPONSE" | grep -q "$tool"; then
-        echo -e "${GREEN}  ✓ $tool${NC}"
+        echo -e "${GREEN}    ✓ $tool${NC}"
     else
-        echo -e "${RED}  ✗ $tool missing${NC}"
+        echo -e "${RED}    ✗ $tool missing${NC}"
+        exit 1
+    fi
+done
+
+# Check for Phase 4 tools (Runtime Inspection)
+PHASE4_TOOLS=("godot_get_threads" "godot_get_stack_trace" "godot_get_scopes" "godot_get_variables" "godot_evaluate")
+echo "  Phase 4 (Runtime Inspection):"
+for tool in "${PHASE4_TOOLS[@]}"; do
+    if echo "$TOOLS_RESPONSE" | grep -q "$tool"; then
+        echo -e "${GREEN}    ✓ $tool${NC}"
+    else
+        echo -e "${RED}    ✗ $tool missing${NC}"
         exit 1
     fi
 done
@@ -309,12 +322,15 @@ echo -e "${GREEN}Summary:${NC}"
 echo "  ✓ Godot launched as subprocess (headless mode)"
 echo "  ✓ DAP server started automatically"
 echo "  ✓ MCP server initialized"
-echo "  ✓ All 7 Phase 3 tools registered"
+echo "  ✓ All 7 Phase 3 tools registered (Core Debugging)"
+echo "  ✓ All 5 Phase 4 tools registered (Runtime Inspection)"
 echo "  ✓ Connected to Godot DAP server"
 echo "  ✓ Set and cleared breakpoint"
 echo "  ✓ Clean disconnection"
 echo ""
 
-echo -e "${YELLOW}Note:${NC} Execution control (continue, step) requires active debugging session."
-echo "Run scene (F5) with breakpoint to test stepping commands."
+echo -e "${YELLOW}Note:${NC} Some tools require an active debugging session:"
+echo "  • Execution control (continue, step) - requires paused game at breakpoint"
+echo "  • Runtime inspection (stack, variables, evaluate) - requires paused game"
+echo "  Run scene (F5) with breakpoint to test these interactively"
 echo ""

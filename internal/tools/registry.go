@@ -15,7 +15,9 @@ func RegisterAll(server *mcp.Server) {
 	RegisterExecutionTools(server)
 	RegisterBreakpointTools(server)
 
+	// Phase 4: Runtime inspection tools
+	RegisterInspectionTools(server)
+
 	// Future tools will be registered here as we implement them:
 	// RegisterLaunchTools(server)
-	// RegisterInspectionTools(server)
 }

@@ -1,6 +1,6 @@
 # Godot DAP MCP Server - Implementation Guide
 
-**Last Updated**: 2025-11-07
+**Last Updated**: 2025-11-08
 
 This document provides detailed component specifications and implementation patterns for the godot-dap-mcp-server. Use this as a reference when implementing or extending the server.
 
@@ -11,6 +11,7 @@ This document provides detailed component specifications and implementation patt
 1. [MCP Server Layer](#mcp-server-layer)
 2. [DAP Client Layer](#dap-client-layer)
 3. [Tool Layer](#tool-layer)
+   - [Formatting Godot Types](#formatting-godot-types)
 4. [Tool Description Guidelines](#tool-description-guidelines)
 5. [Adding New Components](#adding-new-components)
 
@@ -979,6 +980,54 @@ func RegisterLaunchTools(server *mcp.Server, dapClient *dap.Client) {
     // Additional launch tools: godot_launch_scene, godot_launch_current_scene
 }
 ```
+
+### Formatting Godot Types
+
+Location: `internal/tools/formatting.go`
+
+**Purpose**: Enhance DAP variable responses with Godot-specific semantic formatting for better AI readability.
+
+When implementing tools that return Godot variables (like `godot_get_variables` or `godot_evaluate`), use the formatting utilities to add human-readable representations of Godot types:
+
+```go
+// Format a single variable
+func formatVariable(variable dap.Variable) map[string]interface{} {
+    result := map[string]interface{}{
+        "name":  variable.Name,
+        "value": variable.Value,
+        "type":  variable.Type,
+    }
+
+    // Add formatted version if it's a Godot type
+    if formatted := formatGodotType(variable.Type, variable.Value); formatted != "" {
+        result["formatted"] = formatted
+    }
+
+    return result
+}
+
+// Format a list of variables
+variables := formatVariableList(resp.Body.Variables)
+```
+
+**Automatically formatted types:**
+- **Vectors**: `Vector2(x=10, y=20)`, `Vector3(x=1, y=2, z=3)`
+- **Colors**: `Color(r=1.0, g=0.5, b=0.0, a=1.0)`
+- **Bounding boxes**: `Rect2(pos=(10, 20), size=(100, 50))`
+- **Nodes**: `CharacterBody2D (ID:456)`
+- **Collections**: `Array(8): [1, 2, 3, ...]`, `Dictionary(5 keys)`
+
+**Example output:**
+```json
+{
+  "name": "position",
+  "value": "(100.5, 200.3)",
+  "type": "Vector2",
+  "formatted": "Vector2(x=100.5, y=200.3)"
+}
+```
+
+The `formatted` field is optional and only added when a Godot-specific type is detected. Original `value` and `type` fields are always preserved.
 
 ---
 
