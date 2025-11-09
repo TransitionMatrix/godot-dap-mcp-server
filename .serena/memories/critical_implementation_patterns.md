@@ -69,6 +69,15 @@ func (c *Client) waitForResponse(ctx context.Context, expectedCommand string) (*
 - Log events but don't treat them as responses
 - Use timeouts to prevent infinite loops
 
+**Phase 6 Addition - Stopped Event Variants**:
+The `stopped` event has multiple `reason` values. Our event filtering is **already reason-agnostic** (good design!) but be aware of all variants:
+- `"breakpoint"` - Hit breakpoint
+- `"step"` - Step operation completed
+- `"pause"` - User-requested pause (Phase 6)
+- `"exception"` - Runtime error occurred
+
+Our Phase 3 implementation correctly accepts any stopped event regardless of reason.
+
 ## 3. Timeout Protection Pattern
 
 **Problem**: DAP server may hang or not respond to certain requests, causing permanent blocking.
@@ -93,7 +102,7 @@ func (t *Tool) Execute(args map[string]interface{}) (interface{}, error) {
 ```
 
 **Timeout Guidelines**:
-- Quick operations: 10 seconds (connect, breakpoint)
+- Quick operations: 10 seconds (connect, breakpoint, pause)
 - Launch operations: 30 seconds (scene loading)
 - Step operations: 15 seconds (may hit breakpoint)
 - Read operations: 5 seconds (should be fast)
@@ -180,6 +189,22 @@ err := client.StepOut(ctx)
 err := client.Continue(ctx)
 ```
 
+### setVariable Not Implemented (Phase 6 Discovery)
+```go
+// ❌ Godot claims support but doesn't implement it!
+// Capabilities advertise: supportsSetVariable: true
+// Reality: No req_setVariable() method exists
+
+// ✅ Workaround: Use evaluate() with assignment expression
+expression := fmt.Sprintf("%s = %v", varName, newValue)
+result, err := client.Evaluate(ctx, expression, frameId)
+
+// ⚠️ SECURITY: Validate variable names to prevent code injection
+// Pattern: ^[a-zA-Z_][a-zA-Z0-9_]*$
+```
+
+**Critical**: Both `stepOut` and `setVariable` are **false advertising** - Godot's capabilities claim support but don't implement the commands.
+
 ### Absolute Paths Required
 ```go
 // ❌ res:// paths not supported by Godot DAP
@@ -188,5 +213,32 @@ file := "res://scripts/player.gd"
 // ✅ Use absolute paths
 file := "/absolute/path/to/project/scripts/player.gd"
 ```
+
+## 8. Node Inspection Pattern (Phase 6 Discovery)
+
+**Problem**: How to inspect scene tree and node properties via DAP?
+
+**Solution**: Use existing variables system with object expansion
+
+```go
+// Nodes are inspected through OBJECT case in parse_variant()
+// When an object is expanded, parse_object() categorizes properties:
+// - "Members/" prefix → Script members
+// - "Constants/" prefix → Script constants  
+// - "Node/" prefix → Node-specific properties (name, parent, children)
+// - Regular properties grouped by category (Transform2D, CanvasItem, etc.)
+
+// Navigation pattern:
+// 1. Get Members scope (contains 'self')
+// 2. Expand 'self' to get current Node
+// 3. Look for 'Node/children' property
+// 4. Expand children array to navigate tree
+```
+
+**Key Points**:
+- NO separate "scene tree" DAP command exists
+- Scopes are FIXED at 3 types: Locals, Members, Globals (no "SceneTree" scope)
+- Scene tree navigation uses existing `godot_get_variables` tool
+- Document the pattern, don't create redundant tools
 
 For complete debugging stories, see `docs/LESSONS_LEARNED_PHASE_3.md`.
