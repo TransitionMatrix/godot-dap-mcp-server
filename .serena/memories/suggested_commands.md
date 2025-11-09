@@ -170,6 +170,28 @@ git push origin main
 git log --oneline -10
 ```
 
+## Claude Code Skills
+
+Guided workflows via Claude Code skills:
+
+```bash
+# Memory sync - Update memories and docs after significant changes
+/memory-sync
+
+# Phase prep - Research Godot source before implementing a phase
+/phase-prep
+
+# MCP builder - Guidance for MCP server development
+# (external skill, installed via .claude/scripts/setup-skills.sh)
+```
+
+**When to use skills:**
+- `/memory-sync` - After phase completion, architecture changes, or major refactoring
+- `/phase-prep` - Before implementing Phase 5+ to discover Godot quirks upfront
+- Memory sync and phase-prep are **project-specific skills** (checked into repo)
+
+See `CLAUDE.md` for detailed skill documentation.
+
 ## Documentation Access
 ```bash
 # View CLAUDE.md for project guidance
@@ -183,4 +205,7 @@ cat docs/IMPLEMENTATION_GUIDE.md
 
 # View conventions
 cat docs/reference/CONVENTIONS.md
+
+# View documentation workflow (includes phase-prep usage)
+cat docs/DOCUMENTATION_WORKFLOW.md
 ```

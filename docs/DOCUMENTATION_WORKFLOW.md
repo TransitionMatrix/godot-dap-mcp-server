@@ -1,6 +1,6 @@
 # Documentation Workflow
 
-**Last Updated**: 2025-11-07
+**Last Updated**: 2025-11-08
 
 This document explains how to maintain documentation in this project, particularly when completing implementation phases that involve debugging or discovering new patterns.
 
@@ -9,11 +9,12 @@ This document explains how to maintain documentation in this project, particular
 ## Table of Contents
 
 1. [Philosophy](#philosophy)
-2. [Four-Document Pattern](#four-document-pattern)
-3. [When to Create Lessons Learned](#when-to-create-lessons-learned)
-4. [Workflow Example](#workflow-example)
-5. [Cross-Reference Guidelines](#cross-reference-guidelines)
-6. [Benefits](#benefits)
+2. [Pre-Phase Research](#pre-phase-research)
+3. [Four-Document Pattern](#four-document-pattern)
+4. [When to Create Lessons Learned](#when-to-create-lessons-learned)
+5. [Workflow Example](#workflow-example)
+6. [Cross-Reference Guidelines](#cross-reference-guidelines)
+7. [Benefits](#benefits)
 
 ---
 
@@ -26,6 +27,65 @@ This project uses a **hybrid documentation approach** that balances:
 - **Quick troubleshooting** - Providing immediate answers WHEN you hit issues
 
 The result is **strategic redundancy with purpose** - knowledge appears in multiple places, but each instance serves a different audience and use case.
+
+---
+
+## Pre-Phase Research
+
+**BEFORE implementing a phase**, use the `/phase-prep` skill to research Godot's implementation and prevent debugging sessions.
+
+### Purpose
+
+Extract non-obvious insights from Godot source code that would otherwise be discovered through debugging:
+- ✅ Command support verification (e.g., "stepOut not implemented")
+- ✅ Critical setup requirements (e.g., "ConfigurationDone required")
+- ✅ Event handling quirks (e.g., "pause sends 'stopped' with reason='pause'")
+- ✅ Parameter validation edge cases
+
+### When to Use
+
+**Must use before**:
+- Phase 5+ implementation (established patterns, focus on Godot quirks)
+- Any phase adding new DAP commands
+- Features that extend existing commands with new parameters
+
+**Skip for**:
+- Phase 1-4 (patterns being established)
+- Internal refactoring (no new Godot interaction)
+- Polish or documentation-only work
+
+### Workflow
+
+```bash
+# Invoke the phase-prep skill
+/phase-prep
+
+# The skill guides you through:
+# 1. Reading PLAN.md for the phase
+# 2. Researching godot-source memories and implementation
+# 3. Verifying command support
+# 4. Creating PHASE_<N>_IMPLEMENTATION_NOTES.md
+# 5. Updating memories if critical patterns discovered
+```
+
+### Output
+
+Creates `docs/PHASE_<N>_IMPLEMENTATION_NOTES.md` containing:
+- Command support matrix (✅ Implemented / ❌ Not Implemented / ⚠️ Partial)
+- Critical implementation hints (non-obvious behavior)
+- godot-source references (file:line numbers)
+- Event handling requirements
+- Parameter validation quirks
+- Recommended patterns (timeouts, error handling)
+
+**Example valuable findings** (from Phase 3-4 research):
+- stepOut command not implemented → Prevents hang bug
+- ConfigurationDone required for breakpoints → Prevents timeout bug
+- DAP sends async events mixed with responses → Prevents parsing bug
+
+### Success Criterion
+
+The implementing agent should avoid **at least one debugging session** by reading the implementation notes.
 
 ---
 
@@ -299,6 +359,14 @@ Examples:
 - `LESSONS_LEARNED_PHASE_5.md` - Scene launching implementation
 - `LESSONS_LEARNED_PHASE_7.md` - Error handling and polish
 
+### Phase-Specific Implementation Notes (Phase 5+)
+Format: `PHASE_<N>_IMPLEMENTATION_NOTES.md`
+
+Examples:
+- `PHASE_5_IMPLEMENTATION_NOTES.md` - Launch tools Godot research
+- `PHASE_6_IMPLEMENTATION_NOTES.md` - Advanced debugging Godot quirks
+- `PHASE_7_IMPLEMENTATION_NOTES.md` - Error handling edge cases
+
 ### Reference Documentation
 Stable names that grow over time:
 - `ARCHITECTURE.md` - System architecture (add patterns as discovered)
@@ -309,7 +377,15 @@ Stable names that grow over time:
 
 ## Quick Checklist
 
-When completing a phase with significant debugging:
+### Before implementing a phase (Phase 5+):
+
+- [ ] Run `/phase-prep` skill to research Godot implementation
+- [ ] Create `PHASE_<N>_IMPLEMENTATION_NOTES.md` with command support matrix
+- [ ] Verify all commands are supported (or document workarounds)
+- [ ] Document event handling and parameter requirements
+- [ ] Commit with message: "docs: research Phase N Godot implementation"
+
+### After completing a phase with significant debugging:
 
 - [ ] Create `LESSONS_LEARNED_PHASE_<N>.md` with complete narrative
 - [ ] Extract reusable patterns to `IMPLEMENTATION_GUIDE.md`
@@ -330,3 +406,5 @@ When completing a phase with significant debugging:
 ---
 
 **This workflow was established during Phase 3 (2025-11-07)** based on the integration testing debugging journey. It formalizes the hybrid approach for future phases.
+
+**Pre-phase research workflow added (2025-11-08)** via `/phase-prep` skill to prevent debugging sessions through upfront Godot source investigation.
