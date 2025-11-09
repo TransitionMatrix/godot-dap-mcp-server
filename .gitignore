@@ -52,3 +52,4 @@ tests/fixtures/**/*.log
 # Project-specific skills should be excluded from this pattern individually
 .claude/skills/*
 !.claude/skills/memory-sync/
+!.claude/skills/phase-prep/

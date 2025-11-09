@@ -38,6 +38,20 @@ The following Claude Code skills are available for this project:
 
 **When to use:** After phase completions, architecture changes, new pattern discoveries, or major refactoring (5+ files changed).
 
+### phase-prep
+**Location:** `.claude/skills/phase-prep/`
+
+**Purpose:** Research Godot source code to prepare critical implementation notes before implementing a phase:
+- Verify DAP command support in Godot
+- Extract non-obvious insights and quirks
+- Document event handling requirements
+- Create phase-specific implementation notes
+- Prevent debugging sessions through upfront research
+
+**When to use:** Before implementing a new phase (especially Phase 5+) to discover Godot-specific behavior, limitations, and quirks. Examples: stepOut not implemented, ConfigurationDone required, event filtering patterns.
+
+**Output:** Creates `docs/PHASE_<N>_IMPLEMENTATION_NOTES.md` with command support matrix, critical insights, and godot-source references.
+
 ## Documentation
 
 Comprehensive documentation is organized into focused documents:
