@@ -119,12 +119,26 @@ else
     exit 1
 fi
 
-# Check for all Phase 3 tools
-for tool in "godot_connect" "godot_disconnect" "godot_continue" "godot_step_over" "godot_step_into" "godot_set_breakpoint" "godot_clear_breakpoint"; do
+# Check for Phase 3 tools (Core Debugging)
+PHASE3_TOOLS=("godot_connect" "godot_disconnect" "godot_continue" "godot_step_over" "godot_step_into" "godot_set_breakpoint" "godot_clear_breakpoint")
+echo "  Phase 3 (Core Debugging):"
+for tool in "${PHASE3_TOOLS[@]}"; do
     if echo "$TOOLS_RESPONSE" | grep -q "$tool"; then
-        echo -e "${GREEN}  ✓ $tool${NC}"
+        echo -e "${GREEN}    ✓ $tool${NC}"
     else
-        echo -e "${RED}  ✗ $tool missing${NC}"
+        echo -e "${RED}    ✗ $tool missing${NC}"
+        exit 1
+    fi
+done
+
+# Check for Phase 4 tools (Runtime Inspection)
+PHASE4_TOOLS=("godot_get_threads" "godot_get_stack_trace" "godot_get_scopes" "godot_get_variables" "godot_evaluate")
+echo "  Phase 4 (Runtime Inspection):"
+for tool in "${PHASE4_TOOLS[@]}"; do
+    if echo "$TOOLS_RESPONSE" | grep -q "$tool"; then
+        echo -e "${GREEN}    ✓ $tool${NC}"
+    else
+        echo -e "${RED}    ✗ $tool missing${NC}"
         exit 1
     fi
 done
