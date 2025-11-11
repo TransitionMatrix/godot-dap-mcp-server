@@ -186,26 +186,67 @@ Guided workflows via Claude Code skills:
 ```
 
 **When to use skills:**
-- `/memory-sync` - After phase completion, architecture changes, or major refactoring
+- `/memory-sync` - After phase completion, architecture changes, major refactoring, or doc reorganization
 - `/phase-prep` - Before implementing Phase 5+ to discover Godot quirks upfront
 - Memory sync and phase-prep are **project-specific skills** (checked into repo)
 
 See `CLAUDE.md` for detailed skill documentation.
 
 ## Documentation Access
+
+**Core documentation** (top-level docs/):
 ```bash
-# View CLAUDE.md for project guidance
-cat CLAUDE.md
-
-# View architecture documentation
-cat docs/ARCHITECTURE.md
-
-# View implementation guide
-cat docs/IMPLEMENTATION_GUIDE.md
-
-# View conventions
-cat docs/reference/CONVENTIONS.md
-
-# View documentation workflow (includes phase-prep usage)
-cat docs/DOCUMENTATION_WORKFLOW.md
+cat docs/PLAN.md                # Implementation phases and status
+cat docs/ARCHITECTURE.md         # System design and patterns
+cat docs/IMPLEMENTATION_GUIDE.md # Component specifications
+cat docs/TESTING.md             # Testing strategies
+cat docs/DEPLOYMENT.md          # Build and distribution
+cat docs/DOCUMENTATION_WORKFLOW.md # Hybrid docs approach
 ```
+
+**Reference documentation** (docs/reference/):
+```bash
+cat docs/reference/CONVENTIONS.md # Coding standards
+cat docs/reference/DAP_PROTOCOL.md # Godot DAP details
+cat docs/reference/GODOT_DAP_FAQ.md # Troubleshooting
+cat docs/reference/GODOT_SOURCE_ANALYSIS.md # Godot source findings
+
+# Query DAP specification
+jq '.definitions.InitializeRequest' docs/reference/debugAdapterProtocol.json
+```
+
+**Godot upstream submission** (docs/godot-upstream/):
+```bash
+cat docs/godot-upstream/STRATEGY.md  # Multi-PR submission approach
+cat docs/godot-upstream/PROGRESS.md  # Track submission status
+cat docs/godot-upstream/ISSUE_TEMPLATE.md  # GitHub issue template
+cat docs/godot-upstream/PR_TEMPLATE.md     # Pull request template
+```
+
+**Implementation notes** (docs/implementation-notes/):
+```bash
+cat docs/implementation-notes/LESSONS_LEARNED_PHASE_3.md
+cat docs/implementation-notes/PHASE_6_IMPLEMENTATION_NOTES.md
+```
+
+**CLAUDE.md** (project guidance for AI assistants):
+```bash
+cat CLAUDE.md  # Start here for project overview and guidance
+```
+
+## Godot Upstream Testing
+
+Test Dictionary safety issues against godot-upstream:
+
+```bash
+# Start godot-upstream editor (separate from development fork)
+/Users/adp/Projects/godot-upstream/bin/godot.macos.editor.arm64
+
+# Run test tool to expose Dictionary errors
+cd /Users/adp/Projects/godot-dap-mcp-server
+go run cmd/test-dap-protocol/main.go
+
+# Observe Godot console for Dictionary errors
+```
+
+See `docs/godot-upstream/TESTING_GUIDE.md` for comprehensive testing strategy.

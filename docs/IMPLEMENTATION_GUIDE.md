@@ -1087,20 +1087,59 @@ Solutions:
 
 ### Adding a New MCP Tool
 
-1. Create file in `internal/tools/` (e.g., `pause.go`)
-2. Implement tool with proper description pattern
-3. Register in `registry.go`
-4. Add tests in `internal/tools/*_test.go`
-5. Document in user-facing docs
-6. Add to troubleshooting FAQ if needed
+1. **Verify DAP specification** - Check `docs/reference/debugAdapterProtocol.json` for the request definition
+   ```bash
+   jq '.definitions.YourRequestName' docs/reference/debugAdapterProtocol.json
+   ```
+   - Identify required vs optional fields in the `required` array
+   - Note any default values or special handling needed
+
+2. **Consult Godot implementation** - Check `godot-source` for Godot's behavior
+   ```bash
+   mcp__godot-source__find_symbol("req_yourCommand", relative_path="editor/debugger/debug_adapter")
+   ```
+
+3. Create file in `internal/tools/` (e.g., `pause.go`)
+
+4. Implement tool with proper description pattern
+   - Document required vs optional fields from DAP spec
+   - Use safe `.get()` access for all optional fields
+   - Include example showing minimal required fields
+
+5. Register in `registry.go`
+
+6. Add tests in `internal/tools/*_test.go`
+   - Test with minimal required fields
+   - Test with optional fields omitted
+
+7. Document in user-facing docs
+
+8. Add to troubleshooting FAQ if needed
 
 ### Adding a New DAP Command
 
-1. Add method to `internal/dap/client.go`
-2. Add timeout wrapper if blocking
-3. Add response type to event filter in `events.go`
-4. Add tests in `internal/dap/dap_test.go`
-5. Document any Godot-specific behavior
+1. **Verify DAP specification** - Check protocol requirements first
+   ```bash
+   # Check request definition
+   jq '.definitions.YourRequest' docs/reference/debugAdapterProtocol.json
+
+   # Check response definition
+   jq '.definitions.YourResponse' docs/reference/debugAdapterProtocol.json
+   ```
+
+2. Add method to `internal/dap/client.go`
+   - Use safe field access (`.get()` for optional fields)
+   - Follow required field specifications from DAP spec
+
+3. Add timeout wrapper if blocking
+
+4. Add response type to event filter in `events.go`
+
+5. Add tests in `internal/dap/dap_test.go`
+   - Test with minimal required fields per spec
+   - Test with optional fields omitted
+
+6. Document any Godot-specific behavior
 
 ### Extending Godot Launch Options
 

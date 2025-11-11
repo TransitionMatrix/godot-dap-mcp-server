@@ -9,6 +9,8 @@
 - Control execution (continue, step-over, step-in)
 - **Inspect runtime state** (stack traces, variables, scopes, evaluate expressions)
 - **Format Godot types** (Vector2/3, Color, Nodes with semantic labels)
+- **Pause running game** and modify variables at runtime
+- **Navigate scene tree** through Node object expansion
 - Launch game scenes for debugging
 
 ## Architecture
@@ -29,9 +31,10 @@ The system follows a three-layer architecture:
 ### 3. Tool Layer (`internal/tools/`)
 - Godot-specific MCP tools with consistent naming: `godot_<action>_<object>`
 - Global session management via `GetSession()` shared across tool calls
-- **12 tools across 2 phases**:
+- **14 tools across 3 phases**:
   - Phase 3 (7 tools): connect, disconnect, set/clear breakpoints, continue, step-over, step-in
   - Phase 4 (5 tools): get_threads, get_stack_trace, get_scopes, get_variables, evaluate
+  - Phase 6 (2 tools): pause, set_variable
 - **Formatting utilities** (`formatting.go`): Pretty-print 15+ Godot types
 
 ## Protocol Flow
@@ -43,8 +46,9 @@ MCP Client (Claude Code) → stdio → MCP Server → TCP/DAP → Godot Editor �
 - ✅ Phase 1 Complete: Core MCP Server (16 tests)
 - ✅ Phase 2 Complete: DAP Client Layer (28 total tests)
 - ✅ Phase 3 Complete: Core Debugging Tools (43 total tests, integration tests working)
-- ✅ **Phase 4 Complete: Runtime Inspection** (61 total tests, Godot formatting)
-- 🔲 Phase 5-8: Launch tools, advanced features, polish
+- ✅ Phase 4 Complete: Runtime Inspection (61 total tests, Godot formatting)
+- ✅ **Phase 6 Complete: Advanced Tools** (godot_pause, godot_set_variable with security)
+- 🔲 Phase 5, 7-8: Launch tools, polish, documentation
 
 ## Key Technical Insights
 - Single DAP session design (one debugging session at a time)
@@ -52,15 +56,55 @@ MCP Client (Claude Code) → stdio → MCP Server → TCP/DAP → Godot Editor �
 - All DAP operations need timeout protection (10-30s contexts)
 - **ConfigurationDone required**: After `Initialize()`, must call `ConfigurationDone()` or breakpoints timeout
 - Godot validates project paths in launch requests (must have project.godot)
-- Known issue: `stepOut` command not implemented in Godot's DAP server
+- **Known Godot DAP issues**:
+  - `stepOut` command not implemented (will hang)
+  - `setVariable` advertised but not implemented (use evaluate() workaround)
 - **Absolute paths required**: Godot DAP doesn't support `res://` paths (Godot limitation, not DAP)
 - **Godot type formatting**: Vector2/3, Color, Nodes, Arrays automatically get semantic labels for AI readability
+- **Scene tree navigation**: No dedicated command; use object expansion with Node/* properties
+- **Security**: Variable names strictly validated to prevent code injection (regex: `^[a-zA-Z_][a-zA-Z0-9_]*$`)
 
-## Documentation Organization (Phase 3+)
-The project uses a **hybrid documentation approach**:
-- **Phase-specific lessons learned** (`docs/LESSONS_LEARNED_PHASE_N.md`) - Debugging narratives
-- **IMPLEMENTATION_GUIDE.md** - Reusable patterns extracted from lessons
-- **ARCHITECTURE.md** - Critical patterns with rationale
-- **FAQ** - Quick troubleshooting answers
+## Documentation Organization (2025-11-10 Update)
 
-See `docs/DOCUMENTATION_WORKFLOW.md` for the complete workflow.
+The project uses a **purpose-based documentation structure**:
+
+**Top-level docs/** - Active development documentation
+- Core: PLAN, ARCHITECTURE, IMPLEMENTATION_GUIDE, TESTING, DEPLOYMENT
+- DOCUMENTATION_WORKFLOW.md - Hybrid approach with phase-specific lessons
+
+**docs/godot-upstream/** - Upstream submission materials (NEW)
+- STRATEGY.md - Multi-PR submission approach for Godot Dictionary safety fixes
+- Templates ready: ISSUE_TEMPLATE.md, PR_TEMPLATE.md
+- PROGRESS.md tracks submission status
+
+**docs/reference/** - Stable reference materials
+- Protocol details, conventions, FAQ
+- debugAdapterProtocol.json - Official DAP specification (178KB)
+
+**docs/implementation-notes/** - Phase-specific insights
+- PHASE_N_IMPLEMENTATION_NOTES.md - Pre-implementation research (from /phase-prep skill)
+- LESSONS_LEARNED_PHASE_N.md - Post-implementation debugging narratives
+
+**docs/research/** - Research archive (Dictionary safety audits, analysis)
+
+**docs/archive/** - Superseded documents (old strategies, early drafts)
+
+### Documentation Workflow
+
+1. **Before phase**: Run `/phase-prep` → creates PHASE_N_IMPLEMENTATION_NOTES.md
+2. **During phase**: Write code, test, debug
+3. **After phase**: Document lessons in LESSONS_LEARNED_PHASE_N.md
+4. **Extract patterns**: Update ARCHITECTURE.md and IMPLEMENTATION_GUIDE.md with reusable patterns
+5. **Sync memories**: Run `/memory-sync` to update Serena memories
+
+See `docs/DOCUMENTATION_WORKFLOW.md` for complete details.
+
+## Upstream Contribution Status
+
+**Dictionary Safety Fixes for Godot**:
+- Strategy: Multi-PR approach (8-10 small PRs)
+- Location: `docs/godot-upstream/`
+- Status: Phase 1 (Test & Document) ready to begin
+- Test tool: `cmd/test-dap-protocol/` demonstrates unsafe Dictionary access in godot-upstream
+
+See `docs/godot-upstream/STRATEGY.md` for submission plan.

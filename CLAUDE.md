@@ -50,7 +50,7 @@ The following Claude Code skills are available for this project:
 
 **When to use:** Before implementing a new phase (especially Phase 5+) to discover Godot-specific behavior, limitations, and quirks. Examples: stepOut not implemented, ConfigurationDone required, event filtering patterns.
 
-**Output:** Creates `docs/PHASE_<N>_IMPLEMENTATION_NOTES.md` with command support matrix, critical insights, and godot-source references.
+**Output:** Creates `docs/implementation-notes/PHASE_<N>_IMPLEMENTATION_NOTES.md` with command support matrix, critical insights, and godot-source references.
 
 ## Documentation
 
@@ -68,8 +68,55 @@ Comprehensive documentation is organized into focused documents:
 - **[docs/reference/DAP_PROTOCOL.md](docs/reference/DAP_PROTOCOL.md)** - Godot DAP protocol details
 - **[docs/reference/CONVENTIONS.md](docs/reference/CONVENTIONS.md)** - Naming conventions and coding standards
 - **[docs/reference/GODOT_SOURCE_ANALYSIS.md](docs/reference/GODOT_SOURCE_ANALYSIS.md)** - Findings from analyzing Godot source code
+- **[docs/reference/debugAdapterProtocol.json](docs/reference/debugAdapterProtocol.json)** - Official DAP specification (machine-readable, 178KB)
+- **[docs/reference/POPULAR_GODOT_DAP_CLIENTS.md](docs/reference/POPULAR_GODOT_DAP_CLIENTS.md)** - Survey of DAP clients that work with Godot
 
-**When implementing features**: Refer to ARCHITECTURE.md for patterns, IMPLEMENTATION_GUIDE.md for component specs, and reference docs for protocol details.
+### Godot Upstream Submission Materials
+- **[docs/godot-upstream/STRATEGY.md](docs/godot-upstream/STRATEGY.md)** - Multi-PR submission strategy
+- **[docs/godot-upstream/SUBMISSION_GUIDE.md](docs/godot-upstream/SUBMISSION_GUIDE.md)** - Step-by-step submission process
+- **[docs/godot-upstream/TESTING_GUIDE.md](docs/godot-upstream/TESTING_GUIDE.md)** - Testing Dictionary safety issues
+- **[docs/godot-upstream/ISSUE_TEMPLATE.md](docs/godot-upstream/ISSUE_TEMPLATE.md)** - GitHub issue template
+- **[docs/godot-upstream/PR_TEMPLATE.md](docs/godot-upstream/PR_TEMPLATE.md)** - Pull request template
+- **[docs/godot-upstream/PROGRESS.md](docs/godot-upstream/PROGRESS.md)** - Track submission status
+
+### Research & Implementation Notes
+- **[docs/research/](docs/research/)** - Dictionary safety research and analysis documents
+- **[docs/implementation-notes/](docs/implementation-notes/)** - Phase-specific notes and lessons learned
+- **[docs/archive/](docs/archive/)** - Superseded documents (historical reference only)
+
+### DAP Specification Reference
+
+**Official Debug Adapter Protocol Specification:**
+- **Machine-readable JSON**: `docs/reference/debugAdapterProtocol.json` (saved locally, 178KB)
+- **Online specification**: https://microsoft.github.io/debug-adapter-protocol/specification
+- **JSON source**: https://microsoft.github.io/debug-adapter-protocol/debugAdapterProtocol.json
+
+**When to consult the DAP specification:**
+
+**✅ Must consult:**
+- Before implementing a new DAP tool (verify required vs optional fields)
+- When validating DAP message structures (check `required` arrays)
+- When debugging protocol compliance issues
+- When documenting DAP behavior in our tools
+
+**Workflow for new DAP tools:**
+1. Check `docs/reference/debugAdapterProtocol.json` for the request definition
+2. Identify required vs optional fields in the `required` array
+3. Consult `godot-source` memories to see Godot's implementation
+4. Implement with safe `.get()` access for all optional fields
+5. Document required vs optional fields in tool description
+
+**Example: Checking InitializeRequest requirements:**
+```bash
+# Extract the request definition
+jq '.definitions.InitializeRequest' docs/reference/debugAdapterProtocol.json
+
+# Shows:
+# "required": ["command", "arguments"]
+# So arguments is REQUIRED for initialize (unlike base Request)
+```
+
+**When implementing features**: Refer to ARCHITECTURE.md for patterns, IMPLEMENTATION_GUIDE.md for component specs, reference docs for protocol details, and **the DAP specification for protocol compliance**.
 
 ## Code Navigation and Memory Management
 
@@ -431,6 +478,7 @@ Complete implementation patterns are documented in **[docs/IMPLEMENTATION_GUIDE.
 - Adding DAP functionality: See [IMPLEMENTATION_GUIDE.md - DAP Layer](docs/IMPLEMENTATION_GUIDE.md#dap-client-layer)
 - Tool naming convention: `godot_<action>_<object>` (see [CONVENTIONS.md](docs/reference/CONVENTIONS.md))
 - Error message pattern: Problem + Context + Solution (see [CONVENTIONS.md](docs/reference/CONVENTIONS.md#error-message-guidelines))
+- **DAP protocol compliance**: Always verify required fields in `docs/reference/debugAdapterProtocol.json` before implementing
 
 ## Dependencies
 

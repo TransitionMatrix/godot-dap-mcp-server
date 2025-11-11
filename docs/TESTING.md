@@ -36,11 +36,37 @@ This document describes the testing strategy, test types, and testing procedures
 - Event filtering logic
 - Error message formatting
 - Godot launch configurations
+- **DAP protocol compliance** - Verify messages match `docs/reference/debugAdapterProtocol.json`
 
 ❌ **Don't Test**:
 - go-dap library internals (trust the library)
 - Godot's DAP server behavior (trust Godot)
 - Network layer (trust standard library)
+
+### DAP Protocol Compliance Testing
+
+When testing DAP commands, always verify against the official specification:
+
+**Verification checklist**:
+1. ✅ Include all required fields per `docs/reference/debugAdapterProtocol.json`
+2. ✅ Test with minimal required fields (omit optional fields)
+3. ✅ Use safe `.get()` access for optional fields in implementation
+4. ✅ Test messages should be spec-compliant (use `test-dap-protocol` to verify)
+
+**Example workflow**:
+```bash
+# 1. Check spec for required fields
+jq '.definitions.InitializeRequest' docs/reference/debugAdapterProtocol.json
+# Shows: "required": ["command", "arguments"]
+
+# 2. Test with minimal required fields
+# In test: send initialize with only adapterID (required), omit optional fields
+
+# 3. Verify with test program
+go run cmd/test-dap-protocol/main.go
+```
+
+**Testing tool**: `cmd/test-dap-protocol/` - Interactive tool that sends spec-compliant minimal messages to verify Godot's handling of optional fields.
 
 ---
 

@@ -178,9 +178,104 @@ func GetSession() (*dap.Session, error) {
 - Tools use `GetSession()` to access shared session
 - Clear error if not connected
 
-## 7. Known Issues and Workarounds
+## 7. JSON Schema Validation Pattern (Phase 6 Discovery)
 
-### stepOut Not Implemented
+**Problem**: Claude API validates tool schemas against JSON Schema draft 2020-12. Using invalid types causes runtime errors.
+
+**Solution**: Use empty string for "any type" parameters with omitempty tag
+
+```go
+// ❌ WRONG: "any" is not a valid JSON Schema type
+{
+    Name: "value",
+    Type: "any",  // Causes: "JSON schema is invalid"
+}
+
+// ✅ CORRECT: Empty type with omitempty omits field from JSON
+{
+    Name: "value",
+    Type: "",  // Omitted from schema = accepts any type
+}
+
+// PropertyDefinition with omitempty tag
+type PropertyDefinition struct {
+    Type        string      `json:"type,omitempty"`  // Key: omitempty!
+    Description string      `json:"description"`
+    Default     interface{} `json:"default,omitempty"`
+}
+```
+
+**Valid JSON Schema Types** (draft 2020-12):
+- `string`, `number`, `integer`, `boolean`, `object`, `array`, `null`
+- **NOT** `any` (will cause validation error)
+
+**Generated Schema**:
+```json
+// With Type: ""
+{
+  "value": {
+    "description": "New value"
+    // No "type" field = accepts any type ✓
+  }
+}
+
+// With Type: "any" (WRONG!)
+{
+  "value": {
+    "type": "any",  // ❌ Invalid schema!
+    "description": "New value"
+  }
+}
+```
+
+**Key Points**:
+- Use `Type: ""` to accept any value type
+- Add `omitempty` to Type field in PropertyDefinition
+- Test generated schemas with `tools/list` before deployment
+- Claude API errors point to tool index, not the actual problematic tool
+
+## 8. Security Validation Pattern (Phase 6 Discovery)
+
+**Problem**: Tools that execute code (evaluate, set variable) risk code injection attacks.
+
+**Solution**: Strict whitelist validation for user inputs
+
+```go
+// Validate variable names to prevent code injection
+func isValidVariableName(name string) bool {
+    // Only allow: letters, numbers, underscores
+    // Must start with letter or underscore
+    matched, _ := regexp.MatchString(`^[a-zA-Z_][a-zA-Z0-9_]*$`, name)
+    return matched
+}
+
+// ✅ Valid: player_health, _internal, score123
+// ❌ Reject: "health + 10", "get_node('/root').queue_free()"
+
+// Format values for GDScript
+func formatValueForGDScript(value interface{}) string {
+    switch v := value.(type) {
+    case string:
+        return fmt.Sprintf(`"%s"`, escapeString(v))  // Quote strings
+    case int, int64, float64:
+        return fmt.Sprintf("%v", v)  // Numbers as-is
+    case bool:
+        return fmt.Sprintf("%v", v)  // true/false
+    default:
+        return fmt.Sprintf("%v", v)
+    }
+}
+```
+
+**Key Points**:
+- Never trust user input for code execution
+- Whitelist approach (only allow safe characters)
+- Provide clear error messages explaining validation rules
+- Test with injection attack scenarios
+
+## 9. Known Issues and Workarounds
+
+### stepOut Not Implemented (Phase 3)
 ```go
 // ❌ This will hang - stepOut not implemented in Godot
 err := client.StepOut(ctx)
@@ -189,7 +284,7 @@ err := client.StepOut(ctx)
 err := client.Continue(ctx)
 ```
 
-### setVariable Not Implemented (Phase 6 Discovery)
+### setVariable Not Implemented (Phase 6)
 ```go
 // ❌ Godot claims support but doesn't implement it!
 // Capabilities advertise: supportsSetVariable: true
@@ -214,7 +309,7 @@ file := "res://scripts/player.gd"
 file := "/absolute/path/to/project/scripts/player.gd"
 ```
 
-## 8. Node Inspection Pattern (Phase 6 Discovery)
+## 10. Node Inspection Pattern (Phase 6 Discovery)
 
 **Problem**: How to inspect scene tree and node properties via DAP?
 
@@ -241,4 +336,4 @@ file := "/absolute/path/to/project/scripts/player.gd"
 - Scene tree navigation uses existing `godot_get_variables` tool
 - Document the pattern, don't create redundant tools
 
-For complete debugging stories, see `docs/LESSONS_LEARNED_PHASE_3.md`.
+For complete debugging stories, see `docs/LESSONS_LEARNED_PHASE_N.md`.
