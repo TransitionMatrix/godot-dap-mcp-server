@@ -16,6 +16,8 @@ go.work
 
 # Compiled binaries
 godot-dap-mcp-server
+test-dap-protocol
+test-minimal-dap
 build/
 dist/
 

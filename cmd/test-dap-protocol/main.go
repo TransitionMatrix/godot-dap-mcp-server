@@ -114,20 +114,24 @@ func main() {
 			ExpectedError: "(none - all commonly-accessed fields present)",
 		},
 		{
-			Name: "setBreakpoints without 'breakpoints' array (configuration phase)",
+			Name: "setBreakpoints with breakpoint at line 4 (configuration phase)",
 			Message: map[string]interface{}{
 				"seq":     3,
 				"type":    "request",
 				"command": "setBreakpoints",
 				"arguments": map[string]interface{}{
-					"source": map[string]interface{}{"path": "/test.gd"},
-					// Omit breakpoints array - means "clear all" per DAP spec
+					"source": map[string]interface{}{
+						"path": "/Users/adp/Projects/godot-dap-mcp-server/tests/fixtures/test-project/test_script.gd",
+					},
+					"breakpoints": []map[string]interface{}{
+						{"line": 4},
+					},
 				},
 			},
 			SpecRequired:  []string{"seq", "type", "command", "arguments", "arguments.source"},
 			SpecOptional:  []string{"arguments.breakpoints"},
-			GodotExpects:  []string{"arguments.breakpoints"},
-			ExpectedError: `args.get("breakpoints", Array())`,
+			GodotExpects:  []string{},
+			ExpectedError: "(none - valid request with correct path)",
 		},
 		{
 			Name: "configurationDone (triggers actual launch)",
