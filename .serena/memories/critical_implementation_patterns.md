@@ -37,7 +37,7 @@ if err := session.Launch(ctx, launchArgs); err != nil {
 
 **Problem**: Godot's DAP server sends async events (stopped, continued, output, etc.) mixed with command responses. Reading without filtering will return events instead of expected responses.
 
-**Solution**: Always filter for expected response type
+**Solution**: Always filter for expected response type (Phase 6 refinement adds ErrorResponse handling)
 ```go
 func (c *Client) waitForResponse(ctx context.Context, expectedCommand string) (*dap.Response, error) {
     for {
@@ -52,9 +52,22 @@ func (c *Client) waitForResponse(ctx context.Context, expectedCommand string) (*
                 return m, nil
             }
             // Wrong response, keep waiting
+        
+        case *dap.ErrorResponse:
+            // Command failed - return error immediately
+            return nil, fmt.Errorf("command %s returned error: %s", command, m.Message)
+        
         case *dap.Event:
             // Log event but don't return - continue waiting
             c.logEvent(m)
+        
+        // Explicit event types (needed since some don't match *dap.Event)
+        case *dap.InitializedEvent, *dap.StoppedEvent, *dap.ContinuedEvent,
+            *dap.ExitedEvent, *dap.TerminatedEvent, *dap.ThreadEvent,
+            *dap.OutputEvent, *dap.BreakpointEvent, *dap.ModuleEvent:
+            c.logEvent(m)
+            continue
+        
         default:
             // Unknown message type, continue
             continue
@@ -66,7 +79,9 @@ func (c *Client) waitForResponse(ctx context.Context, expectedCommand string) (*
 **Key Points**:
 - Never return on first message - it might be an event
 - Loop until expected response arrives
+- ErrorResponse returns error immediately (no retry)
 - Log events but don't treat them as responses
+- Explicit event type cases needed (some don't match *dap.Event interface)
 - Use timeouts to prevent infinite loops
 
 **Phase 6 Addition - Stopped Event Variants**:
@@ -289,6 +304,16 @@ file := "res://scripts/player.gd"
 // ✅ Use absolute paths
 file := "/absolute/path/to/project/scripts/player.gd"
 ```
+
+### pause Command Response Handling (Phase 6 - Under Investigation)
+**Observation**: After `pause` command, subsequent DAP requests may timeout or receive malformed responses.
+
+**Symptoms**:
+- Commands execute (game steps, pauses) but responses are corrupted
+- Protocol parsing errors: "header format is not '^Content-Length: ([0-9]+)$'"
+- May indicate event messages not being consumed properly
+
+**Status**: Being investigated. May require event filtering improvements or special handling of pause-related stopped events.
 
 ## 10. Node Inspection Pattern (Phase 6 Discovery)
 

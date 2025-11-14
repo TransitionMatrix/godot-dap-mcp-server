@@ -20,11 +20,14 @@ The system follows a three-layer architecture:
 - Stdio-based JSONRPC 2.0 communication with MCP clients (Claude Code)
 - Tool registration and routing
 - Request/response handling
+- JSON Schema generation with proper "any" type handling
 
 ### 2. DAP Client Layer (`internal/dap/`)
 - TCP connection to Godot editor's DAP server (default port: 6006)
 - DAP protocol implementation using `github.com/google/go-dap`
 - Event filtering (critical: DAP sends async events mixed with responses)
+- **ErrorResponse handling** in waitForResponse
+- **Explicit event type cases** for all DAP events
 - Timeout protection (prevents hangs from unresponsive DAP server)
 - Session lifecycle management with state machine
 
@@ -47,7 +50,7 @@ MCP Client (Claude Code) → stdio → MCP Server → TCP/DAP → Godot Editor �
 - ✅ Phase 2 Complete: DAP Client Layer (28 total tests)
 - ✅ Phase 3 Complete: Core Debugging Tools (43 total tests, integration tests working)
 - ✅ Phase 4 Complete: Runtime Inspection (61 total tests, Godot formatting)
-- ✅ **Phase 6 Complete: Advanced Tools** (godot_pause, godot_set_variable with security)
+- ⏳ **Phase 6 WIP: Advanced Tools** (pause, set_variable implemented, runtime testing in progress)
 - 🔲 Phase 5, 7-8: Launch tools, polish, documentation
 
 ## Key Technical Insights
@@ -59,6 +62,7 @@ MCP Client (Claude Code) → stdio → MCP Server → TCP/DAP → Godot Editor �
 - **Known Godot DAP issues**:
   - `stepOut` command not implemented (will hang)
   - `setVariable` advertised but not implemented (use evaluate() workaround)
+  - **pause command may affect DAP response handling** (under investigation)
 - **Absolute paths required**: Godot DAP doesn't support `res://` paths (Godot limitation, not DAP)
 - **Godot type formatting**: Vector2/3, Color, Nodes, Arrays automatically get semantic labels for AI readability
 - **Scene tree navigation**: No dedicated command; use object expansion with Node/* properties
@@ -74,9 +78,14 @@ MCP Client (Claude Code) → stdio → MCP Server → TCP/DAP → Godot Editor �
 - **Usage**: `GODOT_BIN=/path/to/godot ./scripts/test-dap-compliance.sh`
 - **Detects**: Unsafe Dictionary access patterns in godot-upstream
 
+**Debug/Test Utilities**:
+- `cmd/dump-setbreakpoints/` - Inspect DAP message serialization (JSON + wire format)
+- `cmd/launch-test/` - Validate launch → breakpoints → configurationDone sequence
+- `cmd/test-full-debug-workflow/` - End-to-end 17-step debugging workflow test (13 DAP commands)
+
 **Key Finding**: Godot uses SAFE `.get()` for client capabilities but UNSAFE `[]` for optional DAP request fields (Source.name, Source.checksums)
 
-## Documentation Organization (2025-11-10 Update)
+## Documentation Organization (2025-11-14 Update)
 
 The project uses a **purpose-based documentation structure**:
 
@@ -84,15 +93,16 @@ The project uses a **purpose-based documentation structure**:
 - Core: PLAN, ARCHITECTURE, IMPLEMENTATION_GUIDE, TESTING, DEPLOYMENT
 - DOCUMENTATION_WORKFLOW.md - Hybrid approach with phase-specific lessons
 
+**docs/reference/** - Stable reference materials
+- **DAP_SESSION_GUIDE.md** - Complete DAP command reference with session flow examples (1373 lines)
+- Protocol details, conventions, FAQ
+- debugAdapterProtocol.json - Official DAP specification (178KB)
+
 **docs/godot-upstream/** - Upstream submission materials
 - STRATEGY.md - Multi-PR submission approach for Godot Dictionary safety fixes
 - TESTING_GUIDE.md - How to test Dictionary safety issues
 - Templates ready: ISSUE_TEMPLATE.md, PR_TEMPLATE.md
 - PROGRESS.md tracks submission status
-
-**docs/reference/** - Stable reference materials
-- Protocol details, conventions, FAQ
-- debugAdapterProtocol.json - Official DAP specification (178KB)
 
 **docs/implementation-notes/** - Phase-specific insights
 - PHASE_N_IMPLEMENTATION_NOTES.md - Pre-implementation research (from /phase-prep skill)

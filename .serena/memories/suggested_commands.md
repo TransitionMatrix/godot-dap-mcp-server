@@ -37,6 +37,36 @@ go test -coverprofile=coverage.out ./...
 go tool cover -html=coverage.out
 ```
 
+## Debug/Test Utilities
+
+**DAP Protocol Inspection:**
+```bash
+# Dump setBreakpoints request structure
+go run cmd/dump-setbreakpoints/main.go
+
+# Shows JSON and wire format (Content-Length + JSON)
+# Useful for debugging message serialization and path handling
+```
+
+**Launch Sequence Testing:**
+```bash
+# Test launch → breakpoints → configurationDone sequence
+go run cmd/launch-test/main.go
+
+# Validates configuration phase workflow
+# Ensures breakpoints are set before game starts
+```
+
+**Full Debugging Workflow:**
+```bash
+# Run complete 17-step debugging session test
+go run cmd/test-full-debug-workflow/main.go
+
+# Tests: connect, initialize, launch, breakpoints, configurationDone,
+# threads, stack trace, scopes, variables, evaluate, next, stepIn, continue
+# Comprehensive end-to-end validation of all DAP commands
+```
+
 ## Code Quality
 ```bash
 # Format code
