@@ -64,8 +64,9 @@ Comprehensive documentation is organized into focused documents:
 - **[docs/DEPLOYMENT.md](docs/DEPLOYMENT.md)** - Build process, distribution, and installation
 
 ### Reference Documentation
+- **[docs/reference/DAP_SESSION_GUIDE.md](docs/reference/DAP_SESSION_GUIDE.md)** - Complete DAP command reference with session flow examples
 - **[docs/reference/GODOT_DAP_FAQ.md](docs/reference/GODOT_DAP_FAQ.md)** - Common questions and troubleshooting
-- **[docs/reference/DAP_PROTOCOL.md](docs/reference/DAP_PROTOCOL.md)** - Godot DAP protocol details
+- **[docs/reference/DAP_PROTOCOL.md](docs/reference/DAP_PROTOCOL.md)** - Godot DAP protocol details (launch-specific)
 - **[docs/reference/CONVENTIONS.md](docs/reference/CONVENTIONS.md)** - Naming conventions and coding standards
 - **[docs/reference/GODOT_SOURCE_ANALYSIS.md](docs/reference/GODOT_SOURCE_ANALYSIS.md)** - Findings from analyzing Godot source code
 - **[docs/reference/debugAdapterProtocol.json](docs/reference/debugAdapterProtocol.json)** - Official DAP specification (machine-readable, 178KB)

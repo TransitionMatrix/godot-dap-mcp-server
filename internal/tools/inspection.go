@@ -269,15 +269,41 @@ Use this tool:
 - To view variable values in a scope (Locals, Members, Globals)
 - To expand complex objects (Vector2, Node, Array, Dictionary)
 - To inspect object properties and array elements
+- To navigate the scene tree through Node objects
 
 Variables with variablesReference > 0 can be expanded by calling this tool
 again with their variablesReference.
+
+Scene Tree Navigation:
+To navigate the scene tree and inspect nodes:
+1. Get Members scope (contains 'self' - the current Node)
+2. Expand 'self' to see Node properties
+3. Look for properties with 'Node/' prefix (name, parent, children)
+4. Expand 'Node/children' array to see child nodes
+5. Expand each child to inspect its properties
+
+When expanding a Node object, properties are categorized:
+- Members/* - Script member variables (if script attached)
+- Constants/* - Script constants (if script attached)
+- Node/* - Node-specific properties (name, parent, children, scene path)
+- Transform2D/* - Position, rotation, scale (for 2D nodes)
+- Other categories based on node type (CanvasItem, Control, etc.)
 
 Example: Get all local variables
 godot_get_variables(variables_reference=1000)
 
 Example: Expand a Vector2 variable
-godot_get_variables(variables_reference=2000)`,
+godot_get_variables(variables_reference=2000)
+
+Example: Scene tree navigation workflow
+1. godot_get_scopes(frame_id=0)
+   → Returns scopes, Members scope has variables_reference=1001
+2. godot_get_variables(variables_reference=1001)
+   → Returns 'self' with variables_reference=2000
+3. godot_get_variables(variables_reference=2000)
+   → Returns Node properties including 'Node/children' with variables_reference=2050
+4. godot_get_variables(variables_reference=2050)
+   → Returns array of child nodes, each expandable`,
 
 		Parameters: []mcp.Parameter{
 			{
