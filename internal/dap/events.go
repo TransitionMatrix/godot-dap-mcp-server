@@ -47,8 +47,21 @@ func (c *Client) waitForResponse(ctx context.Context, command string) (dap.Messa
 			log.Printf("Received unexpected response for command: %s (waiting for %s)", m.Command, command)
 			continue
 
+		case *dap.ErrorResponse:
+			// Error response - command failed
+			return nil, fmt.Errorf("command %s returned error: %s", command, m.Message)
+
 		case *dap.Event:
 			// Log the event and continue waiting for the response
+			c.logEvent(m)
+			continue
+
+		// Specific event types (need explicit handling since they don't match *dap.Event)
+		case *dap.InitializedEvent, *dap.StoppedEvent, *dap.ContinuedEvent,
+			*dap.ExitedEvent, *dap.TerminatedEvent, *dap.ThreadEvent,
+			*dap.OutputEvent, *dap.BreakpointEvent, *dap.ModuleEvent,
+			*dap.LoadedSourceEvent, *dap.ProcessEvent, *dap.CapabilitiesEvent:
+			// These are all events - log and continue waiting
 			c.logEvent(m)
 			continue
 

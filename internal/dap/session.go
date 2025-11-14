@@ -169,9 +169,13 @@ func (s *Session) SetLaunched() {
 
 // Launch is a convenience method that sends a launch request
 // This will be implemented in godot.go with Godot-specific parameters
+//
+// IMPORTANT: Must be called BEFORE ConfigurationDone!
+// The launch request is stored by Godot and executed when ConfigurationDone is sent.
 func (s *Session) Launch(ctx context.Context, args map[string]interface{}) (*dap.LaunchResponse, error) {
-	if err := s.RequireReady(); err != nil {
-		return nil, err
+	// Launch must be called after Initialize but BEFORE ConfigurationDone
+	if s.state != StateInitialized {
+		return nil, fmt.Errorf("cannot launch: session is in state %s (must be initialized)", s.state)
 	}
 
 	ctx, cancel := WithCommandTimeout(ctx)
@@ -208,6 +212,8 @@ func (s *Session) Launch(ctx context.Context, args map[string]interface{}) (*dap
 		return nil, fmt.Errorf("unexpected response type: %T", response)
 	}
 
-	s.SetLaunched()
+	// Note: Don't call SetLaunched() here! The launch request is just stored.
+	// The actual game launch happens when ConfigurationDone is sent.
+	// State remains StateInitialized until ConfigurationDone.
 	return launchResp, nil
 }
