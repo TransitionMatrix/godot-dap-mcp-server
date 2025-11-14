@@ -61,7 +61,7 @@ type ToolInputSchema struct {
 
 // PropertyDefinition defines a single parameter's schema
 type PropertyDefinition struct {
-	Type        string      `json:"type"`                  // Parameter type
+	Type        string      `json:"type,omitempty"`        // Parameter type (omit for any type)
 	Description string      `json:"description"`           // Parameter description
 	Default     interface{} `json:"default,omitempty"`     // Default value
 }

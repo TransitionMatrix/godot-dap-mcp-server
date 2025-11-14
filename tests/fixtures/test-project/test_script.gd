@@ -10,6 +10,7 @@ func _ready() -> void:
 
 	print("Test script finished!")
 
+
 func calculate_sum(a: int, b: int) -> int:
 	var sum: int = a + b  # Good place for breakpoint (line 13)
 	return sum
