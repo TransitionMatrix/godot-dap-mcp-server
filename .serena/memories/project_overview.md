@@ -64,6 +64,18 @@ MCP Client (Claude Code) → stdio → MCP Server → TCP/DAP → Godot Editor �
 - **Scene tree navigation**: No dedicated command; use object expansion with Node/* properties
 - **Security**: Variable names strictly validated to prevent code injection (regex: `^[a-zA-Z_][a-zA-Z0-9_]*$`)
 
+## Testing Infrastructure
+
+**Compliance Testing** (`cmd/test-dap-protocol/`, `scripts/test-dap-compliance.sh`):
+- **Purpose**: Automated verification of Godot DAP server protocol compliance
+- **Client capabilities**: LLM-optimized (1-based indexing, type support, client identification)
+- **Test sequence**: initialize → launch → setBreakpoints → configurationDone
+- **Validates**: Optional field handling, response ordering, Dictionary safety
+- **Usage**: `GODOT_BIN=/path/to/godot ./scripts/test-dap-compliance.sh`
+- **Detects**: Unsafe Dictionary access patterns in godot-upstream
+
+**Key Finding**: Godot uses SAFE `.get()` for client capabilities but UNSAFE `[]` for optional DAP request fields (Source.name, Source.checksums)
+
 ## Documentation Organization (2025-11-10 Update)
 
 The project uses a **purpose-based documentation structure**:
@@ -72,8 +84,9 @@ The project uses a **purpose-based documentation structure**:
 - Core: PLAN, ARCHITECTURE, IMPLEMENTATION_GUIDE, TESTING, DEPLOYMENT
 - DOCUMENTATION_WORKFLOW.md - Hybrid approach with phase-specific lessons
 
-**docs/godot-upstream/** - Upstream submission materials (NEW)
+**docs/godot-upstream/** - Upstream submission materials
 - STRATEGY.md - Multi-PR submission approach for Godot Dictionary safety fixes
+- TESTING_GUIDE.md - How to test Dictionary safety issues
 - Templates ready: ISSUE_TEMPLATE.md, PR_TEMPLATE.md
 - PROGRESS.md tracks submission status
 
@@ -85,7 +98,8 @@ The project uses a **purpose-based documentation structure**:
 - PHASE_N_IMPLEMENTATION_NOTES.md - Pre-implementation research (from /phase-prep skill)
 - LESSONS_LEARNED_PHASE_N.md - Post-implementation debugging narratives
 
-**docs/research/** - Research archive (Dictionary safety audits, analysis)
+**docs/research/** - Research archive
+- test-3-analysis.md - DAP compliance test findings and Dictionary safety analysis
 
 **docs/archive/** - Superseded documents (old strategies, early drafts)
 
@@ -102,9 +116,14 @@ See `docs/DOCUMENTATION_WORKFLOW.md` for complete details.
 ## Upstream Contribution Status
 
 **Dictionary Safety Fixes for Godot**:
-- Strategy: Multi-PR approach (8-10 small PRs)
-- Location: `docs/godot-upstream/`
-- Status: Phase 1 (Test & Document) ready to begin
-- Test tool: `cmd/test-dap-protocol/` demonstrates unsafe Dictionary access in godot-upstream
+- **Phase**: Research and testing (WIP)
+- **Test tool**: `cmd/test-dap-protocol/` demonstrates unsafe Dictionary access
+- **Automation**: `scripts/test-dap-compliance.sh` for automated verification
+- **Analysis**: `docs/research/test-3-analysis.md` documents findings
+- **Strategy**: Multi-PR approach (8-10 small PRs) in `docs/godot-upstream/STRATEGY.md`
+- **Verified**: Godot HEAD (0b5ad6c73c) still has Dictionary safety issues
 
-See `docs/godot-upstream/STRATEGY.md` for submission plan.
+**Current findings**:
+- `Source::from_json` uses unsafe `[]` for optional fields (name, checksums)
+- These fields are output-only (Godot ignores client values, regenerates from path)
+- Test confirms 2 Dictionary errors with minimal DAP-compliant messages

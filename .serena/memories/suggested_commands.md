@@ -206,10 +206,14 @@ cat docs/DOCUMENTATION_WORKFLOW.md # Hybrid docs approach
 
 **Reference documentation** (docs/reference/):
 ```bash
-cat docs/reference/CONVENTIONS.md # Coding standards
-cat docs/reference/DAP_PROTOCOL.md # Godot DAP details
-cat docs/reference/GODOT_DAP_FAQ.md # Troubleshooting
-cat docs/reference/GODOT_SOURCE_ANALYSIS.md # Godot source findings
+# DAP Protocol
+cat docs/reference/DAP_SESSION_GUIDE.md # Complete DAP command reference + session flow
+cat docs/reference/DAP_PROTOCOL.md      # Godot DAP details (launch-specific)
+cat docs/reference/GODOT_DAP_FAQ.md     # Common questions and troubleshooting
+
+# Other references
+cat docs/reference/CONVENTIONS.md            # Coding standards
+cat docs/reference/GODOT_SOURCE_ANALYSIS.md  # Godot source findings
 
 # Query DAP specification
 jq '.definitions.InitializeRequest' docs/reference/debugAdapterProtocol.json
@@ -217,8 +221,9 @@ jq '.definitions.InitializeRequest' docs/reference/debugAdapterProtocol.json
 
 **Godot upstream submission** (docs/godot-upstream/):
 ```bash
-cat docs/godot-upstream/STRATEGY.md  # Multi-PR submission approach
-cat docs/godot-upstream/PROGRESS.md  # Track submission status
+cat docs/godot-upstream/STRATEGY.md        # Multi-PR submission approach
+cat docs/godot-upstream/TESTING_GUIDE.md   # Testing Dictionary safety issues
+cat docs/godot-upstream/PROGRESS.md        # Track submission status
 cat docs/godot-upstream/ISSUE_TEMPLATE.md  # GitHub issue template
 cat docs/godot-upstream/PR_TEMPLATE.md     # Pull request template
 ```

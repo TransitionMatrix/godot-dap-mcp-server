@@ -209,25 +209,6 @@ type PropertyDefinition struct {
 - `string`, `number`, `integer`, `boolean`, `object`, `array`, `null`
 - **NOT** `any` (will cause validation error)
 
-**Generated Schema**:
-```json
-// With Type: ""
-{
-  "value": {
-    "description": "New value"
-    // No "type" field = accepts any type ✓
-  }
-}
-
-// With Type: "any" (WRONG!)
-{
-  "value": {
-    "type": "any",  // ❌ Invalid schema!
-    "description": "New value"
-  }
-}
-```
-
 **Key Points**:
 - Use `Type: ""` to accept any value type
 - Add `omitempty` to Type field in PropertyDefinition
@@ -335,5 +316,37 @@ file := "/absolute/path/to/project/scripts/player.gd"
 - Scopes are FIXED at 3 types: Locals, Members, Globals (no "SceneTree" scope)
 - Scene tree navigation uses existing `godot_get_variables` tool
 - Document the pattern, don't create redundant tools
+
+## 11. Godot Dictionary Safety Pattern (Upstream Research)
+
+**Finding**: Godot's DAP implementation inconsistently uses safe vs unsafe Dictionary access.
+
+**Evidence** (from compliance testing):
+```cpp
+// ✅ SAFE: Client capabilities (req_initialize:133-136)
+peer->linesStartAt1 = args.get("linesStartAt1", false);
+peer->columnsStartAt1 = args.get("columnsStartAt1", false);
+
+// ❌ UNSAFE: Source parsing (debug_adapter_types.h:87-89)
+name = p_params["name"];           // Crashes if "name" missing
+path = p_params["path"];           
+_checksums = p_params["checksums"]; // Crashes if "checksums" missing
+```
+
+**Impact**:
+- DAP spec marks `name` and `checksums` as **optional**
+- Godot uses these fields as **output-only** (ignores client values, regenerates from path)
+- Test tool triggers 2 Dictionary errors with minimal DAP-compliant messages
+- Verified in godot-upstream HEAD (0b5ad6c73c) - issues persist
+
+**Testing**:
+- Tool: `cmd/test-dap-protocol/` sends minimal DAP messages
+- Automation: `scripts/test-dap-compliance.sh` for verification
+- Detects unsafe Dictionary access in req_setBreakpoints path
+
+**Client Capabilities for LLM/MCP**:
+- Use 1-based indexing (human-friendly line numbers)
+- Request type information (aids debugging context)
+- Identify as "godot-dap-mcp-server" in logs
 
 For complete debugging stories, see `docs/LESSONS_LEARNED_PHASE_N.md`.
