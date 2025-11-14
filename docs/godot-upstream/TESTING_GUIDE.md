@@ -6,7 +6,59 @@ This guide explains how to send minimal DAP requests to expose the unsafe Dictio
 
 ## Quick Start
 
-### Interactive Go Test Program (Recommended)
+### Automated Testing (Recommended for PR Strategy)
+
+The fastest way to test Dictionary safety issues against any Godot build:
+
+```bash
+# Set the Godot binary to test
+export GODOT_BIN=/Users/adp/Projects/godot-upstream/bin/godot.macos.editor.arm64
+
+# Run automated test
+./scripts/test-dap-compliance.sh
+```
+
+**What it does:**
+1. Starts Godot in the background with DAP enabled
+2. Waits for DAP server to be ready
+3. Runs all compliance tests automatically (no manual input)
+4. Captures output to timestamped files
+5. Analyzes Godot console for Dictionary errors
+6. Reports pass/fail with error counts
+7. Cleans up automatically
+
+**Output files:**
+- Test output: `/tmp/godot-dap-test-output-YYYYMMDD-HHMMSS.txt`
+- Godot console: `/tmp/godot-console-<PID>.log`
+
+**Exit codes:**
+- `0` - All tests passed, no Dictionary errors
+- `1` - Dictionary errors detected
+
+**Custom options:**
+```bash
+# Use different port
+DAP_PORT=6007 ./scripts/test-dap-compliance.sh
+
+# Use different project
+PROJECT_PATH=/path/to/project.godot ./scripts/test-dap-compliance.sh
+
+# Custom output location
+OUTPUT_FILE=/custom/path/output.txt ./scripts/test-dap-compliance.sh
+```
+
+**Prerequisites:**
+- `GODOT_BIN` environment variable set to Godot binary path
+- `nc` (netcat) command available (standard on macOS/Linux)
+- Go 1.16+ installed
+
+See [Automated Testing Workflow](#automated-testing-workflow) below for detailed usage in PR strategy.
+
+---
+
+### Interactive Go Test Program
+
+For manual exploration and understanding:
 
 ```bash
 # Run directly (builds on first run)
@@ -25,6 +77,12 @@ go build -o test-dap-protocol cmd/test-dap-protocol/main.go
 - Proper multi-message DAP parsing
 - Pretty-printed JSON
 - **Spec-compliant messages** (based on official DAP specification)
+
+**When to use:**
+- Learning about DAP protocol requirements
+- Understanding specific test cases
+- Observing Godot's responses in detail
+- Debugging specific commands
 
 **DAP Specification Reference:**
 The official Debug Adapter Protocol specification is saved in:
@@ -293,6 +351,87 @@ DAP uses raw TCP sockets, not HTTP, so curl won't work directly.
 
 ---
 
+## Automated Testing Workflow
+
+### Phase 1: Document Dictionary Errors (PR Strategy)
+
+Use automated testing to systematically document all Dictionary errors in upstream Godot:
+
+**Step 1: Test upstream Godot**
+```bash
+# Set upstream binary
+export GODOT_BIN=/Users/adp/Projects/godot-upstream/bin/godot.macos.editor.arm64
+
+# Run automated test
+./scripts/test-dap-compliance.sh
+
+# Output saved to /tmp/godot-dap-test-output-YYYYMMDD-HHMMSS.txt
+```
+
+**Step 2: Analyze results**
+```bash
+# Check Dictionary error count
+# Script reports: "Dictionary Errors: N"
+
+# Review Godot console for specific errors
+cat /tmp/godot-console-<PID>.log | grep -A 2 "Dictionary::operator\[\]"
+```
+
+**Step 3: Document findings**
+
+For each DAP command that triggers errors, create an entry in your tracking document:
+
+```markdown
+## req_initialize()
+- **File**: `editor/debugger/debug_adapter/debug_adapter_parser.cpp`
+- **Line**: ~42
+- **Unsafe access**: `p_params["arguments"]`
+- **Test**: Initialize with minimal fields
+- **Error**: Dictionary::operator[] at core/variant/dictionary.cpp:136
+- **Fix**: `p_params.get("arguments", Dictionary())`
+```
+
+**Step 4: Repeat for development branch**
+```bash
+# Test your fixes
+export GODOT_BIN=/Users/adp/Projects/godot/bin/godot.macos.editor.arm64
+./scripts/test-dap-compliance.sh
+
+# Should report: "Dictionary Errors: 0"
+```
+
+### Continuous Testing
+
+Use automated testing during development:
+
+```bash
+# After each fix, verify it works
+export GODOT_BIN=/path/to/your/godot/build
+./scripts/test-dap-compliance.sh
+
+# Script returns exit code 0 on success, 1 on errors
+# Perfect for CI/CD integration
+```
+
+### Comparing Builds
+
+Test multiple Godot builds to compare behavior:
+
+```bash
+# Test upstream (expect errors)
+GODOT_BIN=/path/to/upstream/godot OUTPUT_FILE=/tmp/upstream-results.txt \
+  ./scripts/test-dap-compliance.sh
+
+# Test your fixes (expect no errors)
+GODOT_BIN=/path/to/fixed/godot OUTPUT_FILE=/tmp/fixed-results.txt \
+  ./scripts/test-dap-compliance.sh
+
+# Compare results
+diff /tmp/upstream-results.txt /tmp/fixed-results.txt
+```
+
+---
+
 ## Conclusion
 
 These tests demonstrate that:
@@ -301,5 +440,10 @@ These tests demonstrate that:
 2. ✅ Well-behaved clients (like ours) don't trigger them
 3. ✅ Minimal/strict clients expose the bugs
 4. ✅ Our fixes make the code robust for all clients
+
+**Testing strategies:**
+- **Automated**: Fast, repeatable, perfect for PR strategy Phase 1
+- **Interactive**: Educational, detailed observation, good for understanding
+- **Manual**: Flexible, ad-hoc testing, custom scenarios
 
 Use these tests to validate that our PR is necessary even though normal testing doesn't reveal the issues.

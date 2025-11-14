@@ -236,17 +236,46 @@ cat CLAUDE.md  # Start here for project overview and guidance
 
 ## Godot Upstream Testing
 
-Test Dictionary safety issues against godot-upstream:
+Test Dictionary safety issues against Godot builds:
 
+**Automated testing** (recommended):
 ```bash
-# Start godot-upstream editor (separate from development fork)
+# Set Godot binary path
+export GODOT_BIN=/Users/adp/Projects/godot/bin/godot.macos.editor.arm64
+
+# Run automated compliance test
+./scripts/test-dap-compliance.sh
+
+# With custom options
+DAP_PORT=6007 PROJECT_PATH=path/to/project.godot ./scripts/test-dap-compliance.sh
+
+# Test against upstream Godot
+export GODOT_BIN=/Users/adp/Projects/godot-upstream/bin/godot.macos.editor.arm64
+./scripts/test-dap-compliance.sh
+```
+
+The automated script:
+- Starts Godot in the background with DAP enabled
+- Runs test-dap-protocol in automated mode (no manual input)
+- Captures output to timestamped file
+- Analyzes Godot console for Dictionary errors
+- Cleans up automatically
+- Returns exit code 0 if no errors, 1 if errors found
+
+**Manual testing**:
+```bash
+# Start Godot editor manually
 /Users/adp/Projects/godot-upstream/bin/godot.macos.editor.arm64
 
-# Run test tool to expose Dictionary errors
+# In another terminal: Run test tool (interactive mode)
 cd /Users/adp/Projects/godot-dap-mcp-server
 go run cmd/test-dap-protocol/main.go
 
 # Observe Godot console for Dictionary errors
 ```
+
+**Output locations**:
+- Test output: `/tmp/godot-dap-test-output-YYYYMMDD-HHMMSS.txt`
+- Godot console: `/tmp/godot-console-<PID>.log`
 
 See `docs/godot-upstream/TESTING_GUIDE.md` for comprehensive testing strategy.
