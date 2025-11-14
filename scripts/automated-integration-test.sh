@@ -241,6 +241,18 @@ for tool in "${PHASE4_TOOLS[@]}"; do
         exit 1
     fi
 done
+
+# Check for Phase 6 tools (Advanced Debugging)
+PHASE6_TOOLS=("godot_pause" "godot_set_variable")
+echo "  Phase 6 (Advanced Debugging):"
+for tool in "${PHASE6_TOOLS[@]}"; do
+    if echo "$TOOLS_RESPONSE" | grep -q "$tool"; then
+        echo -e "${GREEN}    ✓ $tool${NC}"
+    else
+        echo -e "${RED}    ✗ $tool missing${NC}"
+        exit 1
+    fi
+done
 echo ""
 
 # Test 3: Connect to Godot DAP server
@@ -324,6 +336,7 @@ echo "  ✓ DAP server started automatically"
 echo "  ✓ MCP server initialized"
 echo "  ✓ All 7 Phase 3 tools registered (Core Debugging)"
 echo "  ✓ All 5 Phase 4 tools registered (Runtime Inspection)"
+echo "  ✓ All 2 Phase 6 tools registered (Advanced Debugging)"
 echo "  ✓ Connected to Godot DAP server"
 echo "  ✓ Set and cleared breakpoint"
 echo "  ✓ Clean disconnection"
@@ -332,5 +345,6 @@ echo ""
 echo -e "${YELLOW}Note:${NC} Some tools require an active debugging session:"
 echo "  • Execution control (continue, step) - requires paused game at breakpoint"
 echo "  • Runtime inspection (stack, variables, evaluate) - requires paused game"
+echo "  • Advanced debugging (pause, set_variable) - requires running/paused game"
 echo "  Run scene (F5) with breakpoint to test these interactively"
 echo ""

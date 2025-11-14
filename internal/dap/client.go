@@ -3,7 +3,9 @@ package dap
 import (
 	"bufio"
 	"context"
+	"encoding/json"
 	"fmt"
+	"log"
 	"net"
 	"sync"
 
@@ -112,6 +114,12 @@ func (c *Client) write(msg dap.Message) error {
 	if !c.connected {
 		return fmt.Errorf("not connected")
 	}
+
+	// DEBUG: Log the message being sent
+	if jsonBytes, err := json.MarshalIndent(msg, "", "  "); err == nil {
+		log.Printf("=== SENDING DAP MESSAGE ===\n%s\n=========================", string(jsonBytes))
+	}
+
 	return dap.WriteProtocolMessage(c.conn, msg)
 }
 
@@ -328,6 +336,41 @@ func (c *Client) StepIn(ctx context.Context, threadId int) (*dap.StepInResponse,
 	}
 
 	return stepInResp, nil
+}
+
+// Pause pauses execution of the specified thread
+// Use threadId 1 for Godot (single thread)
+// This will trigger a 'stopped' event with reason='pause'
+func (c *Client) Pause(ctx context.Context, threadId int) (*dap.PauseResponse, error) {
+	request := &dap.PauseRequest{
+		Request: dap.Request{
+			ProtocolMessage: dap.ProtocolMessage{
+				Seq:  c.nextRequestSeq(),
+				Type: "request",
+			},
+			Command: "pause",
+		},
+		Arguments: dap.PauseArguments{
+			ThreadId: threadId,
+		},
+	}
+
+	if err := c.write(request); err != nil {
+		return nil, fmt.Errorf("failed to send pause request: %w", err)
+	}
+
+	// Wait for pause response
+	response, err := c.waitForResponse(ctx, "pause")
+	if err != nil {
+		return nil, err
+	}
+
+	pauseResp, ok := response.(*dap.PauseResponse)
+	if !ok {
+		return nil, fmt.Errorf("unexpected response type: %T", response)
+	}
+
+	return pauseResp, nil
 }
 
 // Threads requests the list of active threads.
