@@ -158,9 +158,24 @@ func main() {
 			ExpectedError: "(none - threadId never accessed, no Dictionary errors possible)",
 		},
 		{
-			Name: "terminate - stop the game",
+			Name: "stackTrace - discover WHERE execution stopped after step",
 			Message: map[string]interface{}{
 				"seq":     6,
+				"type":    "request",
+				"command": "stackTrace",
+				"arguments": map[string]interface{}{
+					"threadId": 1,
+				},
+			},
+			SpecRequired:  []string{"seq", "type", "command", "arguments", "arguments.threadId"},
+			SpecOptional:  []string{"arguments.startFrame", "arguments.levels", "arguments.format"},
+			GodotExpects:  []string{"threadId (safe .get with default)"},
+			ExpectedError: "(none - response shows current location: file, function, line, column)",
+		},
+		{
+			Name: "terminate - stop the game",
+			Message: map[string]interface{}{
+				"seq":     7,
 				"type":    "request",
 				"command": "terminate",
 			},
@@ -172,7 +187,7 @@ func main() {
 		{
 			Name: "disconnect - cleanup (only if 'exited' event not received)",
 			Message: map[string]interface{}{
-				"seq":     7,
+				"seq":     8,
 				"type":    "request",
 				"command": "disconnect",
 			},
@@ -198,18 +213,18 @@ func main() {
 	for i, test := range tests {
 		testNum := i + 1
 
-		// Special handling for terminate test (test 6)
-		if testNum == 6 {
+		// Special handling for terminate test (test 7)
+		if testNum == 7 {
 			lastMessages = runTest(testNum, test, conn, reader, stdin, 5*time.Second)
 			// Check for events
 			receivedTerminated, receivedExited = checkTerminationEvents(lastMessages)
 			continue
 		}
 
-		// Special handling for disconnect test (test 7)
-		if testNum == 7 {
+		// Special handling for disconnect test (test 8)
+		if testNum == 8 {
 			if receivedExited {
-				fmt.Printf("%s[SKIP] Test 7: Already received 'exited' event, disconnect not needed%s\n\n", colorYellow, colorReset)
+				fmt.Printf("%s[SKIP] Test 8: Already received 'exited' event, disconnect not needed%s\n\n", colorYellow, colorReset)
 				continue
 			}
 			fmt.Printf("%s[INFO] 'exited' event not received after 5s, sending disconnect...%s\n\n", colorYellow, colorReset)
