@@ -96,22 +96,19 @@ func main() {
 			ExpectedError: "(none - should work cleanly)",
 		},
 		{
-			Name: "Launch with all commonly-used fields (valid Godot launch)",
+			Name: "Launch - minimal (empty arguments, all defaults)",
 			Message: map[string]interface{}{
 				"seq":     2,
 				"type":    "request",
 				"command": "launch",
 				"arguments": map[string]interface{}{
-					"project": "/Users/adp/Projects/godot-dap-mcp-server/tests/fixtures/test-project",
-					"scene":   "main",
-					"noDebug": false,
-					// Other optional fields: platform, address, remote_port, etc.
+					// Empty - tests that Godot safely handles missing fields
 				},
 			},
 			SpecRequired:  []string{"seq", "type", "command", "arguments"},
-			SpecOptional:  []string{"arguments.noDebug", "__restart", "arguments.project (Godot)", "arguments.scene (Godot)"},
-			GodotExpects:  []string{"arguments.noDebug (accessed unsafely at _launch_process:204)"},
-			ExpectedError: "(none - all commonly-accessed fields present)",
+			SpecOptional:  []string{"arguments.request", "arguments.noDebug", "arguments.project", "arguments.scene", "arguments.platform", "arguments.device", "arguments.playArgs", "arguments.godot/custom_data"},
+			GodotExpects:  []string{"All fields safe: project (.has check:171), godot/custom_data (.has check:178), noDebug (.get default:204), platform (.get default:208), scene (.get default:211), device (.get default:220), playArgs (.has check:189)"},
+			ExpectedError: "(none - all reads Dictionary-safe, will use defaults: scene='main', platform='host', noDebug=false, device=-1, playArgs=[])",
 		},
 		{
 			Name: "setBreakpoints with breakpoint at line 4 (configuration phase)",
@@ -145,6 +142,45 @@ func main() {
 			GodotExpects:  []string{},
 			ExpectedError: "(none - required step per DAP protocol)",
 		},
+		{
+			Name: "next (step over) - assumes breakpoint was hit",
+			Message: map[string]interface{}{
+				"seq":     5,
+				"type":    "request",
+				"command": "next",
+				"arguments": map[string]interface{}{
+					"threadId": 1,
+				},
+			},
+			SpecRequired:  []string{"seq", "type", "command", "arguments", "arguments.threadId"},
+			SpecOptional:  []string{"arguments.granularity", "arguments.singleThread"},
+			GodotExpects:  []string{"seq (safe .get), command (safe .get), does NOT read 'arguments' at all"},
+			ExpectedError: "(none - threadId never accessed, no Dictionary errors possible)",
+		},
+		{
+			Name: "terminate - stop the game",
+			Message: map[string]interface{}{
+				"seq":     6,
+				"type":    "request",
+				"command": "terminate",
+			},
+			SpecRequired:  []string{"seq", "type", "command"},
+			SpecOptional:  []string{"arguments.restart"},
+			GodotExpects:  []string{"seq (safe .get), command (safe .get)"},
+			ExpectedError: "(none - expect 'terminate' response + 'terminated' event + 'exited' event)",
+		},
+		{
+			Name: "disconnect - cleanup (only if 'exited' event not received)",
+			Message: map[string]interface{}{
+				"seq":     7,
+				"type":    "request",
+				"command": "disconnect",
+			},
+			SpecRequired:  []string{"seq", "type", "command"},
+			SpecOptional:  []string{"arguments.restart", "arguments.terminateDebuggee"},
+			GodotExpects:  []string{"seq (safe .get), command (safe .get)"},
+			ExpectedError: "(none - final cleanup command)",
+		},
 	}
 
 	reader := bufio.NewReader(conn)
@@ -153,12 +189,42 @@ func main() {
 	printInstructions()
 	waitForEnter(stdin)
 
+	// Track events for summary
+	var receivedTerminated bool
+	var receivedExited bool
+	var lastMessages []map[string]interface{}
+
 	// Run tests
 	for i, test := range tests {
-		runTest(i+1, test, conn, reader, stdin)
+		testNum := i + 1
+
+		// Special handling for terminate test (test 6)
+		if testNum == 6 {
+			lastMessages = runTest(testNum, test, conn, reader, stdin, 5*time.Second)
+			// Check for events
+			receivedTerminated, receivedExited = checkTerminationEvents(lastMessages)
+			continue
+		}
+
+		// Special handling for disconnect test (test 7)
+		if testNum == 7 {
+			if receivedExited {
+				fmt.Printf("%s[SKIP] Test 7: Already received 'exited' event, disconnect not needed%s\n\n", colorYellow, colorReset)
+				continue
+			}
+			fmt.Printf("%s[INFO] 'exited' event not received after 5s, sending disconnect...%s\n\n", colorYellow, colorReset)
+			lastMessages = runTest(testNum, test, conn, reader, stdin, 5*time.Second)
+			// Check again for events
+			_, exitedFromDisconnect := checkTerminationEvents(lastMessages)
+			receivedExited = receivedExited || exitedFromDisconnect
+			continue
+		}
+
+		// Regular test
+		runTest(testNum, test, conn, reader, stdin, 2*time.Second)
 	}
 
-	printSummary()
+	printSummary(receivedTerminated, receivedExited)
 }
 
 func printHeader() {
@@ -184,10 +250,25 @@ func printInstructions() {
 	fmt.Printf("%s→ Press ENTER to start testing%s ", colorYellow, colorReset)
 }
 
-func printSummary() {
+func printSummary(receivedTerminated, receivedExited bool) {
 	fmt.Printf("\n%s%s", colorBold, strings.Repeat("═", 60))
 	fmt.Printf("\n  Testing Complete\n")
 	fmt.Printf("%s%s\n\n", strings.Repeat("═", 60), colorReset)
+
+	// Report on termination events
+	fmt.Printf("%sTermination Event Status:%s\n", colorYellow, colorReset)
+	if receivedTerminated {
+		fmt.Printf("  %s✓ Received 'terminated' event%s\n", colorGreen, colorReset)
+	} else {
+		fmt.Printf("  %s✗ Did NOT receive 'terminated' event%s\n", colorRed, colorReset)
+	}
+	if receivedExited {
+		fmt.Printf("  %s✓ Received 'exited' event%s\n", colorGreen, colorReset)
+	} else {
+		fmt.Printf("  %s✗ Did NOT receive 'exited' event%s\n", colorRed, colorReset)
+	}
+	fmt.Println()
+
 	fmt.Printf("%sCheck Godot Console Output:%s\n", colorYellow, colorReset)
 	fmt.Println("  • With UNSAFE code: Dictionary error messages")
 	fmt.Println("  • With SAFE code: No errors, clean responses")
@@ -198,7 +279,7 @@ func printSummary() {
 	fmt.Println()
 }
 
-func runTest(testNum int, test TestCase, conn net.Conn, reader *bufio.Reader, stdin *bufio.Reader) {
+func runTest(testNum int, test TestCase, conn net.Conn, reader *bufio.Reader, stdin *bufio.Reader, timeout time.Duration) []map[string]interface{} {
 	// Print test header
 	fmt.Printf("%s%s\n", colorBold, strings.Repeat("━", 60))
 	fmt.Printf("%sTEST %d: %s%s\n", colorBlue, testNum, test.Name, colorReset)
@@ -230,12 +311,12 @@ func runTest(testNum int, test TestCase, conn net.Conn, reader *bufio.Reader, st
 	err := sendDAPMessage(conn, test.Message)
 	if err != nil {
 		fmt.Printf("%s✗ Failed to send: %v%s\n\n", colorRed, err, colorReset)
-		return
+		return nil
 	}
 
 	// Read all responses (with timeout)
-	fmt.Printf("%s✓ Message sent, waiting for response...%s\n\n", colorGreen+colorBold, colorReset)
-	messages := readAllDAPMessages(conn, reader, 2*time.Second)
+	fmt.Printf("%s✓ Message sent, waiting for response (timeout: %v)...%s\n\n", colorGreen+colorBold, timeout, colorReset)
+	messages := readAllDAPMessages(conn, reader, timeout)
 
 	// Display responses
 	fmt.Printf("%s<<< RECEIVED FROM GODOT <<<<%s\n\n", colorRed, colorReset)
@@ -255,6 +336,8 @@ func runTest(testNum int, test TestCase, conn net.Conn, reader *bufio.Reader, st
 	fmt.Printf("%s→ Press ENTER to continue to next test (Ctrl-C to exit)%s ", colorYellow, colorReset)
 	waitForEnter(stdin)
 	fmt.Println()
+
+	return messages
 }
 
 func connectToGodot() (net.Conn, error) {
@@ -360,4 +443,26 @@ func readDAPMessage(reader *bufio.Reader) (string, error) {
 
 func waitForEnter(stdin *bufio.Reader) {
 	stdin.ReadString('\n')
+}
+
+func checkTerminationEvents(messages []map[string]interface{}) (hasTerminated bool, hasExited bool) {
+	for _, msg := range messages {
+		msgType, ok := msg["type"].(string)
+		if !ok || msgType != "event" {
+			continue
+		}
+
+		event, ok := msg["event"].(string)
+		if !ok {
+			continue
+		}
+
+		if event == "terminated" {
+			hasTerminated = true
+		}
+		if event == "exited" {
+			hasExited = true
+		}
+	}
+	return hasTerminated, hasExited
 }

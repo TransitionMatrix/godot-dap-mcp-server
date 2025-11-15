@@ -474,5 +474,34 @@ DAP sends async events mixed with responses. Event filtering pattern (in Phase 2
 
 ---
 
-**Last Updated**: 2025-11-07
-**Project Status**: Phase 2 Complete, Phase 3 In Progress
+## Future Work
+
+### Godot-Specific DAP Extensions
+
+**Investigation**: `godot/custom_data` Event Handling
+
+Godot provides a non-standard DAP extension (`godot/custom_data`) that forwards internal debugger messages as custom DAP events. This feature is opt-in via `launch` arguments.
+
+**Potential Benefits**:
+- Access to `evaluation_return` events (may provide richer evaluation results than standard DAP)
+- Scene inspection data (`scene:inspect_objects`)
+- Profiler data (`profiler:frame_data`)
+- Other internal Godot messages
+
+**Investigation Tasks**:
+1. Document all custom event types Godot sends
+2. Evaluate which events would be useful for AI debugging agents
+3. Test `evaluation_return` to see if it provides better data than standard evaluate responses
+4. Determine if scene inspection events enable better node/scene tree navigation
+5. Assess profiling data usefulness for performance debugging
+
+**Current Status**: Not implemented. Standard DAP events are sufficient for basic debugging workflows.
+
+**Reference**: See [DAP_PROTOCOL.md - Godot-Specific Extensions](reference/DAP_PROTOCOL.md#godot-specific-extensions)
+
+**Priority**: Low (Nice-to-have for advanced features)
+
+---
+
+**Last Updated**: 2025-11-14
+**Project Status**: Phases 1-4 Complete, Phase 6 Complete, Phases 5, 7-8 Pending

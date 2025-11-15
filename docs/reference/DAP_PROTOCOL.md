@@ -41,20 +41,31 @@ Based on Godot source (`editor/debugger/debug_adapter/debug_adapter_parser.cpp`)
 
 ### Field Details
 
-| Field | Type | Required | Default | Description |
-|-------|------|----------|---------|-------------|
-| `project` | string | No | Editor's current project | Absolute path to project directory |
-| `scene` | string | No | `"main"` | Scene to launch (see modes below) |
-| `platform` | string | No | `"host"` | Target platform |
-| `device` | integer | No | `-1` | Android device index |
-| `noDebug` | boolean | No | `false` | Skip breakpoints |
-| `profiling` | boolean | No | `false` | Enable performance profiling |
-| `debug_collisions` | boolean | No | `false` | Show collision shapes visually |
-| `debug_paths` | boolean | No | `false` | Show path navigation |
-| `debug_navigation` | boolean | No | `false` | Show navigation mesh |
-| `debug_avoidance` | boolean | No | `false` | Show avoidance obstacles |
-| `additional_options` | string | No | `""` | Additional CLI arguments |
-| `playArgs` | array | No | `[]` | Array of CLI arguments |
+**Core Fields (Based on Godot Source Analysis)**:
+
+| Field | Type | Default | Purpose | Read When | Dictionary Safety |
+|-------|------|---------|---------|-----------|-------------------|
+| `request` | string | - | **Ignored by Godot** | Never | N/A (never accessed) |
+| `project` | string | - | Validate project path | `req_launch:171` | ✅ Safe (`.has()` check before `.get()`) |
+| `godot/custom_data` | bool | `false` | Custom data support | `req_launch:178` | ✅ Safe (`.has()` check before `.get()`) |
+| `noDebug` | bool | `false` | Skip breakpoints | `_launch_process:204` | ✅ Safe (`.get()` with default) |
+| `platform` | string | `"host"` | Platform: "host", "android", "web" | `_launch_process:208` | ✅ Safe (`.get()` with default) |
+| `scene` | string | `"main"` | Scene: "main", "current", or path | `_launch_process:211` | ✅ Safe (`.get()` with default) |
+| `playArgs` | array | `[]` | Command-line arguments | `_launch_process:210` via `_extract_play_arguments:189` | ✅ Safe (`.has()` check, type validation) |
+| `device` | int | `-1` | Device ID (android/web) | `_launch_process:220` | ✅ Safe (`.get()` with default) |
+
+**Additional Debug Visualization Fields** (all optional, not verified in source):
+
+| Field | Type | Default | Description |
+|-------|------|---------|-------------|
+| `profiling` | boolean | `false` | Enable performance profiling |
+| `debug_collisions` | boolean | `false` | Show collision shapes visually |
+| `debug_paths` | boolean | `false` | Show path navigation |
+| `debug_navigation` | boolean | `false` | Show navigation mesh |
+| `debug_avoidance` | boolean | `false` | Show avoidance obstacles |
+| `additional_options` | string | `""` | Additional CLI arguments |
+
+**Note**: All field reads use safe Dictionary access patterns (`.get()` with defaults or `.has()` checks), preventing Dictionary access errors.
 
 ### Godot Source Implementation
 
@@ -362,6 +373,82 @@ Godot always returns **exactly 3 scopes**:
 - **Locals**: Function-local variables
 - **Members**: Instance/class members (properties)
 - **Globals**: Global variables and autoloads
+
+---
+
+## Godot-Specific Extensions
+
+Godot extends the standard DAP protocol with custom features.
+
+### Custom Data Events (`godot/custom_data`)
+
+**Purpose**: Opt-in forwarding of internal Godot debugger messages as DAP events.
+
+**How to Enable**:
+```json
+{
+  "type": "request",
+  "command": "launch",
+  "arguments": {
+    "godot/custom_data": true
+  }
+}
+```
+
+**Implementation** (`debug_adapter_parser.cpp:178-180`):
+```cpp
+if (args.has("godot/custom_data")) {
+    DebugAdapterProtocol::get_singleton()->get_current_peer()->supportsCustomData =
+        args.get("godot/custom_data", false);
+}
+```
+
+**Event Format**:
+```json
+{
+  "type": "event",
+  "event": "godot/custom_data",
+  "body": {
+    "message": "event_name",
+    "data": [/* event-specific data */]
+  }
+}
+```
+
+**When Events Are Sent** (`debug_adapter_protocol.cpp:1166-1198`):
+
+All internal debugger messages are broadcast as `godot/custom_data` events to clients that opted in:
+- Scene inspection: `"scene:inspect_objects"`
+- Evaluation results: `"evaluation_return"` ⚠️ **May be useful for evaluate() commands**
+- Profiler data: `"profiler:frame_data"`
+- Other internal messages not handled by standard DAP
+
+**Use Cases**:
+- ✅ Advanced Godot-aware IDE plugins
+- ✅ Profiling tools that need raw profiler data
+- ✅ Custom debuggers extending DAP with Godot features
+- ❌ **Not recommended for generic DAP clients** (extra noise)
+
+**Our MCP Server**: Currently not using this feature. Standard DAP events are sufficient for debugging workflows.
+
+**Note on `evaluation_return`**: This event may contain useful information when implementing evaluate() functionality. Consider investigating if standard DAP evaluate responses are insufficient.
+
+### Custom Commands
+
+Godot also provides a custom `godot/put_msg` command for sending messages to the debuggee:
+
+```json
+{
+  "type": "request",
+  "command": "godot/put_msg",
+  "arguments": {
+    "message": "custom_message",
+    "data": []
+  }
+}
+```
+
+This is primarily for internal Godot tools and not recommended for external DAP clients.
 
 ---
 
