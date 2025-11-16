@@ -451,28 +451,57 @@ This example shows a minimal debugging session with actual JSON messages:
   "body": {
     "stackFrames": [
       {
-        "id": 1,
-        "name": "_process",
+        "id": 0,
+        "name": "calculate_sum",
         "source": {
-          "path": "/Users/user/project/player.gd"
+          "path": "/Users/user/project/test_script.gd",
+          "name": "test_script.gd",
+          "checksums": [
+            {
+              "algorithm": "MD5",
+              "checksum": "187c6f2eb1e8016309f0c8875f1a2061"
+            },
+            {
+              "algorithm": "SHA256",
+              "checksum": "5baba6b7784def4d93dfd08e53aa306159cf0d22edaa323da1e7ca8eadbd888c"
+            }
+          ]
         },
-        "line": 10,
-        "column": 1
+        "line": 15,
+        "column": 0
       },
       {
-        "id": 2,
+        "id": 1,
         "name": "_ready",
         "source": {
-          "path": "/Users/user/project/player.gd"
+          "path": "/Users/user/project/test_script.gd",
+          "name": "test_script.gd",
+          "checksums": [
+            {
+              "algorithm": "MD5",
+              "checksum": "187c6f2eb1e8016309f0c8875f1a2061"
+            },
+            {
+              "algorithm": "SHA256",
+              "checksum": "5baba6b7784def4d93dfd08e53aa306159cf0d22edaa323da1e7ca8eadbd888c"
+            }
+          ]
         },
-        "line": 5,
-        "column": 1
+        "line": 6,
+        "column": 0
       }
     ],
     "totalFrames": 2
   }
 }
 ```
+
+**Key observations**:
+- **Checksums**: Godot includes both MD5 and SHA256 checksums in source objects (DAP optional feature)
+- **Frame ordering**: Innermost frame first (current function at index 0)
+- **Frame IDs**: Sequential numbering (0, 1, 2...) used for subsequent scopes/variables requests
+- **Column position**: Always 0 for GDScript (language doesn't track column positions)
+- **Use case**: Call stackTrace after stepping commands (stepIn, next) to verify execution location
 
 ### 9. Get Variable Scopes
 
@@ -1136,7 +1165,10 @@ This example shows a minimal debugging session with actual JSON messages:
 
 **Purpose**: Get call stack when paused
 
-**When to use**: After `stopped` event, to see execution context
+**When to use**:
+- After `stopped` event, to see execution context
+- After stepping commands (stepIn, next) to verify location
+- To discover current function and call hierarchy
 
 **Request**:
 ```json
@@ -1152,10 +1184,22 @@ This example shows a minimal debugging session with actual JSON messages:
 
 **Response**: Array of stack frames with source locations
 
+**Response structure**:
+- `stackFrames[0]` - Current execution point (innermost frame)
+- `stackFrames[1..n]` - Caller chain (outer frames)
+- Each frame includes:
+  - `id` - Frame identifier for scopes/variables requests
+  - `name` - Function/method name
+  - `source` - File path with checksums (MD5 + SHA256)
+  - `line` - Current line number (1-based if `linesStartAt1: true`)
+  - `column` - Always 0 for GDScript
+
 **Notes**:
 - Must be paused (at breakpoint or after step)
 - Frame IDs used in subsequent `scopes` requests
 - `totalFrames` shows complete stack depth
+- **Godot includes checksums**: Both MD5 and SHA256 for source file verification
+- **Verification pattern**: Use stackTrace immediately after stepIn to confirm you entered the expected function
 
 ---
 

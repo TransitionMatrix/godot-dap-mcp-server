@@ -269,7 +269,62 @@ func formatValueForGDScript(value interface{}) string {
 - Provide clear error messages explaining validation rules
 - Test with injection attack scenarios
 
-## 9. Known Issues and Workarounds
+## 9. stackTrace Verification Pattern (Test Discovery)
+
+**Problem**: After stepping commands (stepIn, next, stepOver), how do you verify you're at the expected location?
+
+**Solution**: Use stackTrace immediately after stepping to confirm location
+
+```go
+// Test pattern (from cmd/test-dap-protocol/main.go)
+// 1. stepIn - Step into function
+{
+    "command": "stepIn",
+    "arguments": { "threadId": 1 }
+}
+
+// 2. stackTrace - Verify we stepped into the expected function
+{
+    "command": "stackTrace",
+    "arguments": { "threadId": 1 }
+}
+
+// Expected response shows current location:
+{
+    "stackFrames": [
+        {
+            "id": 0,
+            "name": "calculate_sum",  // ✅ Confirms we stepped into this function
+            "line": 15,              // ✅ At expected line
+            "column": 0,             // Always 0 for GDScript
+            "source": {
+                "path": "/path/to/test_script.gd",
+                "checksums": [         // Godot includes MD5 + SHA256
+                    { "algorithm": "MD5", "checksum": "..." },
+                    { "algorithm": "SHA256", "checksum": "..." }
+                ]
+            }
+        },
+        {
+            "id": 1,
+            "name": "_ready",        // Caller function
+            "line": 6
+        }
+    ]
+}
+```
+
+**Key Points**:
+- **Verification workflow**: stepIn → stackTrace → verify frame[0].name and line
+- **Checksums**: Godot always includes MD5 and SHA256 checksums in source objects (DAP optional feature)
+- **Frame ordering**: Innermost frame first (current function at index 0)
+- **Column position**: Always 0 for GDScript (language doesn't track columns)
+- **Use in tools**: stackTrace is essential for confirming stepping worked correctly
+- **Testing pattern**: Use this workflow in compliance tests to verify DAP commands
+
+**Discovery context**: Found while implementing Test 8 in `cmd/test-dap-protocol/main.go` to verify stepIn behavior.
+
+## 10. Known Issues and Workarounds
 
 ### stepOut Not Implemented (Phase 3)
 ```go
@@ -315,7 +370,7 @@ file := "/absolute/path/to/project/scripts/player.gd"
 
 **Status**: Being investigated. May require event filtering improvements or special handling of pause-related stopped events.
 
-## 10. Node Inspection Pattern (Phase 6 Discovery)
+## 11. Node Inspection Pattern (Phase 6 Discovery)
 
 **Problem**: How to inspect scene tree and node properties via DAP?
 
@@ -342,7 +397,7 @@ file := "/absolute/path/to/project/scripts/player.gd"
 - Scene tree navigation uses existing `godot_get_variables` tool
 - Document the pattern, don't create redundant tools
 
-## 11. Godot Dictionary Safety Pattern (Upstream Research)
+## 12. Godot Dictionary Safety Pattern (Upstream Research)
 
 **Finding**: Godot's DAP implementation inconsistently uses safe vs unsafe Dictionary access.
 

@@ -173,9 +173,39 @@ func main() {
 			ExpectedError: "(none - response shows current location: file, function, line, column)",
 		},
 		{
-			Name: "terminate - stop the game",
+			Name: "stepIn (step into function) - Godot ignores ALL arguments",
 			Message: map[string]interface{}{
 				"seq":     7,
+				"type":    "request",
+				"command": "stepIn",
+				"arguments": map[string]interface{}{
+					"threadId": 1,
+				},
+			},
+			SpecRequired:  []string{"seq", "type", "command", "arguments", "arguments.threadId"},
+			SpecOptional:  []string{"arguments.granularity", "arguments.singleThread", "arguments.targetId"},
+			GodotExpects:  []string{"seq (safe .get), command (safe .get), does NOT read 'arguments' at all"},
+			ExpectedError: "(none - arguments completely ignored, no Dictionary access)",
+		},
+		{
+			Name: "stackTrace - verify we stepped INTO calculate_sum function",
+			Message: map[string]interface{}{
+				"seq":     8,
+				"type":    "request",
+				"command": "stackTrace",
+				"arguments": map[string]interface{}{
+					"threadId": 1,
+				},
+			},
+			SpecRequired:  []string{"seq", "type", "command", "arguments", "arguments.threadId"},
+			SpecOptional:  []string{"arguments.startFrame", "arguments.levels", "arguments.format"},
+			GodotExpects:  []string{"threadId (safe .get with default)"},
+			ExpectedError: "(none - should show calculate_sum at line 15 in test_script.gd)",
+		},
+		{
+			Name: "terminate - stop the game",
+			Message: map[string]interface{}{
+				"seq":     9,
 				"type":    "request",
 				"command": "terminate",
 			},
@@ -187,7 +217,7 @@ func main() {
 		{
 			Name: "disconnect - cleanup (only if 'exited' event not received)",
 			Message: map[string]interface{}{
-				"seq":     8,
+				"seq":     10,
 				"type":    "request",
 				"command": "disconnect",
 			},
@@ -213,18 +243,18 @@ func main() {
 	for i, test := range tests {
 		testNum := i + 1
 
-		// Special handling for terminate test (test 7)
-		if testNum == 7 {
+		// Special handling for terminate test (test 9)
+		if testNum == 9 {
 			lastMessages = runTest(testNum, test, conn, reader, stdin, 5*time.Second)
 			// Check for events
 			receivedTerminated, receivedExited = checkTerminationEvents(lastMessages)
 			continue
 		}
 
-		// Special handling for disconnect test (test 8)
-		if testNum == 8 {
+		// Special handling for disconnect test (test 10)
+		if testNum == 10 {
 			if receivedExited {
-				fmt.Printf("%s[SKIP] Test 8: Already received 'exited' event, disconnect not needed%s\n\n", colorYellow, colorReset)
+				fmt.Printf("%s[SKIP] Test 10: Already received 'exited' event, disconnect not needed%s\n\n", colorYellow, colorReset)
 				continue
 			}
 			fmt.Printf("%s[INFO] 'exited' event not received after 5s, sending disconnect...%s\n\n", colorYellow, colorReset)

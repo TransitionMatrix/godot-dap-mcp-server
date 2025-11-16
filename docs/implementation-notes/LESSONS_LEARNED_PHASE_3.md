@@ -618,10 +618,109 @@ Phase 3 is complete! 🎉
 
 ---
 
-**Document Version**: 1.0
-**Last Updated**: 2025-11-07
+## Addendum: stackTrace Verification Pattern
+
+**Date**: 2025-11-15
+**Context**: Enhancing DAP compliance testing with execution location verification
+
+### Discovery
+
+While implementing comprehensive DAP protocol compliance tests (`cmd/test-dap-protocol/main.go`), we discovered a critical verification pattern:
+
+**Problem**: After sending stepping commands (stepIn, next), how do you verify the command actually worked?
+
+**Solution**: Use `stackTrace` immediately after stepping to confirm execution location.
+
+### Implementation Pattern
+
+```json
+// Test 7: Step into function
+{
+  "command": "stepIn",
+  "arguments": { "threadId": 1 }
+}
+
+// Test 8: Verify we stepped into the expected function
+{
+  "command": "stackTrace",
+  "arguments": { "threadId": 1 }
+}
+```
+
+**Expected stackTrace response**:
+```json
+{
+  "body": {
+    "stackFrames": [
+      {
+        "id": 0,
+        "name": "calculate_sum",  // ✅ Confirms stepIn worked
+        "line": 15,               // ✅ At expected line
+        "column": 0,              // Always 0 for GDScript
+        "source": {
+          "path": "/path/to/test_script.gd",
+          "name": "test_script.gd",
+          "checksums": [          // Godot includes both MD5 and SHA256
+            {
+              "algorithm": "MD5",
+              "checksum": "187c6f2eb1e8016309f0c8875f1a2061"
+            },
+            {
+              "algorithm": "SHA256",
+              "checksum": "5baba6b7784def4d93dfd08e53aa306159cf0d22edaa323da1e7ca8eadbd888c"
+            }
+          ]
+        }
+      },
+      {
+        "id": 1,
+        "name": "_ready",         // Caller function
+        "line": 6,
+        "column": 0
+      }
+    ]
+  }
+}
+```
+
+### Key Insights
+
+1. **Checksums Included**: Godot's stackTrace responses include both MD5 and SHA256 checksums for source files. This is an optional DAP feature that Godot implements.
+
+2. **Frame Ordering**: Stack frames are ordered innermost-first. The current execution point is always `stackFrames[0]`.
+
+3. **Column Always Zero**: GDScript doesn't track column positions, so `column` is always 0.
+
+4. **Frame IDs Sequential**: Frame IDs are 0, 1, 2... and are used for subsequent `scopes` and `variables` requests.
+
+5. **Verification Workflow**:
+   - Send stepping command (stepIn, next, stepOver)
+   - Wait for response (command completes asynchronously)
+   - Send stackTrace request
+   - Verify `stackFrames[0].name` matches expected function
+   - Verify `stackFrames[0].line` is expected line number
+
+### Value for Testing
+
+This pattern is now used in `cmd/test-dap-protocol/main.go` to:
+- Verify stepIn successfully enters functions
+- Confirm execution location after stepping
+- Demonstrate proper DAP protocol workflows
+- Test that Godot's stackTrace implementation includes all expected fields
+
+### Related Documentation
+
+- Pattern added to `critical_implementation_patterns.md` memory (Pattern #9)
+- Enhanced `DAP_SESSION_GUIDE.md` with detailed stackTrace example showing checksums
+- Test implementation: `cmd/test-dap-protocol/main.go` (Tests 7-8)
+
+---
+
+**Document Version**: 1.1
+**Last Updated**: 2025-11-15
 **Related Files**:
 - `scripts/automated-integration-test.sh`
 - `scripts/integration-test.sh`
 - `tests/INTEGRATION_TEST.md`
 - `internal/tools/connect.go`
+- `cmd/test-dap-protocol/main.go`
