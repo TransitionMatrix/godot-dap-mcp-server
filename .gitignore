@@ -14,10 +14,16 @@
 # Go workspace file
 go.work
 
-# Compiled binaries
-godot-dap-mcp-server
-test-dap-protocol
-test-minimal-dap
+# Compiled binaries (only in root directory)
+/godot-dap-mcp-server
+/test-dap-protocol
+/test-minimal-dap
+
+# Compiled binaries in cmd subdirectories
+cmd/*/godot-dap-mcp-server
+cmd/*/test-dap-protocol
+cmd/*/test-minimal-dap
+
 build/
 dist/
 
