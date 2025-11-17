@@ -26,10 +26,11 @@ const (
 type TestCase struct {
 	Name          string
 	Message       map[string]interface{}
-	SpecRequired  []string // Fields REQUIRED by DAP spec
-	SpecOptional  []string // Fields OPTIONAL by DAP spec
-	GodotExpects  []string // Fields Godot expects (causing errors if missing)
-	ExpectedError string   // What Dictionary error this should trigger
+	SpecRequired  []string      // Fields REQUIRED by DAP spec
+	SpecOptional  []string      // Fields OPTIONAL by DAP spec
+	GodotExpects  []string      // Fields Godot expects (causing errors if missing)
+	ExpectedError string        // What Dictionary error this should trigger
+	Timeout       time.Duration // Timeout for waiting for response (default: 2s)
 }
 
 func main() {
@@ -94,13 +95,14 @@ func main() {
 			},
 			GodotExpects:  []string{},
 			ExpectedError: "(none - should work cleanly)",
+			Timeout:       2 * time.Second,
 		},
 		{
 			Name: "Launch - minimal (empty arguments, all defaults)",
 			Message: map[string]interface{}{
-				"seq":     2,
-				"type":    "request",
-				"command": "launch",
+				"seq":       2,
+				"type":      "request",
+				"command":   "launch",
 				"arguments": map[string]interface{}{
 					// Empty - tests that Godot safely handles missing fields
 				},
@@ -109,6 +111,7 @@ func main() {
 			SpecOptional:  []string{"arguments.request", "arguments.noDebug", "arguments.project", "arguments.scene", "arguments.platform", "arguments.device", "arguments.playArgs", "arguments.godot/custom_data"},
 			GodotExpects:  []string{"All fields safe: project (.has check:171), godot/custom_data (.has check:178), noDebug (.get default:204), platform (.get default:208), scene (.get default:211), device (.get default:220), playArgs (.has check:189)"},
 			ExpectedError: "(none - all reads Dictionary-safe, will use defaults: scene='main', platform='host', noDebug=false, device=-1, playArgs=[])",
+			Timeout:       2 * time.Second,
 		},
 		{
 			Name: "setBreakpoints with breakpoint at line 4 (configuration phase)",
@@ -129,6 +132,7 @@ func main() {
 			SpecOptional:  []string{"arguments.breakpoints"},
 			GodotExpects:  []string{},
 			ExpectedError: "(none - valid request with correct path)",
+			Timeout:       2 * time.Second,
 		},
 		{
 			Name: "configurationDone (triggers actual launch)",
@@ -141,6 +145,7 @@ func main() {
 			SpecOptional:  []string{},
 			GodotExpects:  []string{},
 			ExpectedError: "(none - required step per DAP protocol)",
+			Timeout:       5 * time.Second,
 		},
 		{
 			Name: "next (step over) - assumes breakpoint was hit",
@@ -156,6 +161,7 @@ func main() {
 			SpecOptional:  []string{"arguments.granularity", "arguments.singleThread"},
 			GodotExpects:  []string{"seq (safe .get), command (safe .get), does NOT read 'arguments' at all"},
 			ExpectedError: "(none - threadId never accessed, no Dictionary errors possible)",
+			Timeout:       2 * time.Second,
 		},
 		{
 			Name: "stackTrace - discover WHERE execution stopped after step",
@@ -171,6 +177,7 @@ func main() {
 			SpecOptional:  []string{"arguments.startFrame", "arguments.levels", "arguments.format"},
 			GodotExpects:  []string{"threadId (safe .get with default)"},
 			ExpectedError: "(none - response shows current location: file, function, line, column)",
+			Timeout:       2 * time.Second,
 		},
 		{
 			Name: "stepIn (step into function) - Godot ignores ALL arguments",
@@ -186,6 +193,7 @@ func main() {
 			SpecOptional:  []string{"arguments.granularity", "arguments.singleThread", "arguments.targetId"},
 			GodotExpects:  []string{"seq (safe .get), command (safe .get), does NOT read 'arguments' at all"},
 			ExpectedError: "(none - arguments completely ignored, no Dictionary access)",
+			Timeout:       2 * time.Second,
 		},
 		{
 			Name: "stackTrace - verify we stepped INTO calculate_sum function",
@@ -201,6 +209,7 @@ func main() {
 			SpecOptional:  []string{"arguments.startFrame", "arguments.levels", "arguments.format"},
 			GodotExpects:  []string{"threadId (safe .get with default)"},
 			ExpectedError: "(none - should show calculate_sum at line 15 in test_script.gd)",
+			Timeout:       2 * time.Second,
 		},
 		{
 			Name: "stepOut (step out of function) - Godot ignores ALL arguments",
@@ -216,6 +225,7 @@ func main() {
 			SpecOptional:  []string{"arguments.granularity", "arguments.singleThread"},
 			GodotExpects:  []string{"seq (safe .get), command (safe .get), does NOT read 'arguments' at all"},
 			ExpectedError: "(none - arguments completely ignored, no Dictionary access)",
+			Timeout:       2 * time.Second,
 		},
 		{
 			Name: "stackTrace - verify we stepped OUT of calculate_sum back to caller",
@@ -231,6 +241,7 @@ func main() {
 			SpecOptional:  []string{"arguments.startFrame", "arguments.levels", "arguments.format"},
 			GodotExpects:  []string{"threadId (safe .get with default)"},
 			ExpectedError: "(none - should show caller context after stepping out of calculate_sum)",
+			Timeout:       2 * time.Second,
 		},
 		{
 			Name: "terminate - stop the game",
@@ -243,6 +254,7 @@ func main() {
 			SpecOptional:  []string{"arguments.restart"},
 			GodotExpects:  []string{"seq (safe .get), command (safe .get)"},
 			ExpectedError: "(none - expect 'terminate' response + 'terminated' event + 'exited' event)",
+			Timeout:       5 * time.Second,
 		},
 		{
 			Name: "disconnect - cleanup (only if 'exited' event not received)",
@@ -255,6 +267,7 @@ func main() {
 			SpecOptional:  []string{"arguments.restart", "arguments.terminateDebuggee"},
 			GodotExpects:  []string{"seq (safe .get), command (safe .get)"},
 			ExpectedError: "(none - final cleanup command)",
+			Timeout:       5 * time.Second,
 		},
 	}
 
@@ -275,7 +288,7 @@ func main() {
 
 		// Special handling for terminate test (test 11)
 		if testNum == 11 {
-			lastMessages = runTest(testNum, test, conn, reader, stdin, 5*time.Second)
+			lastMessages = runTest(testNum, test, conn, reader, stdin)
 			// Check for events
 			receivedTerminated, receivedExited = checkTerminationEvents(lastMessages)
 			continue
@@ -287,8 +300,8 @@ func main() {
 				fmt.Printf("%s[SKIP] Test 12: Already received 'exited' event, disconnect not needed%s\n\n", colorYellow, colorReset)
 				continue
 			}
-			fmt.Printf("%s[INFO] 'exited' event not received after 5s, sending disconnect...%s\n\n", colorYellow, colorReset)
-			lastMessages = runTest(testNum, test, conn, reader, stdin, 5*time.Second)
+			fmt.Printf("%s[INFO] 'exited' event not received, sending disconnect...%s\n\n", colorYellow, colorReset)
+			lastMessages = runTest(testNum, test, conn, reader, stdin)
 			// Check again for events
 			_, exitedFromDisconnect := checkTerminationEvents(lastMessages)
 			receivedExited = receivedExited || exitedFromDisconnect
@@ -296,7 +309,7 @@ func main() {
 		}
 
 		// Regular test
-		runTest(testNum, test, conn, reader, stdin, 2*time.Second)
+		runTest(testNum, test, conn, reader, stdin)
 	}
 
 	printSummary(receivedTerminated, receivedExited)
@@ -354,7 +367,7 @@ func printSummary(receivedTerminated, receivedExited bool) {
 	fmt.Println()
 }
 
-func runTest(testNum int, test TestCase, conn net.Conn, reader *bufio.Reader, stdin *bufio.Reader, timeout time.Duration) []map[string]interface{} {
+func runTest(testNum int, test TestCase, conn net.Conn, reader *bufio.Reader, stdin *bufio.Reader) []map[string]interface{} {
 	// Print test header
 	fmt.Printf("%s%s\n", colorBold, strings.Repeat("━", 60))
 	fmt.Printf("%sTEST %d: %s%s\n", colorBlue, testNum, test.Name, colorReset)
@@ -390,8 +403,8 @@ func runTest(testNum int, test TestCase, conn net.Conn, reader *bufio.Reader, st
 	}
 
 	// Read all responses (with timeout)
-	fmt.Printf("%s✓ Message sent, waiting for response (timeout: %v)...%s\n\n", colorGreen+colorBold, timeout, colorReset)
-	messages := readAllDAPMessages(conn, reader, timeout)
+	fmt.Printf("%s✓ Message sent, waiting for response (timeout: %v)...%s\n\n", colorGreen+colorBold, test.Timeout, colorReset)
+	messages := readAllDAPMessages(conn, reader, test.Timeout)
 
 	// Display responses
 	fmt.Printf("%s<<< RECEIVED FROM GODOT <<<<%s\n\n", colorRed, colorReset)
