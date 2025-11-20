@@ -156,16 +156,39 @@ For full details, see [ARCHITECTURE.md - DAP Protocol Handshake Pattern](../ARCH
 **A**:
 - ✅ `next` (step over) - Supported
 - ✅ `stepIn` (step into) - Supported
-- ❌ `stepOut` (step out) - **NOT IMPLEMENTED**
+- ❌ `stepOut` (step out) - **NOT IMPLEMENTED in DAP**
 
 ### Q: Why is stepOut not working?
-**A**: **Godot does not implement stepOut**
-- No `req_stepOut()` method exists in Godot's source code
-- Confirmed in: `editor/debugger/debug_adapter/debug_adapter_parser.cpp`
-- Workarounds:
-  - Set breakpoint after function call, use `continue`
-  - Step through remaining lines manually
-  - Notify user that stepOut is unavailable
+**A**: **Critical Version-Specific Limitation**
+
+**Godot 4.6+** (November 2025+):
+- ✅ Editor debugger **HAS** step-out (`debug_step_out()` method, Alt+F11)
+- ❌ DAP server **DOES NOT** expose step-out to external clients
+- **Feature parity gap**: Editor users can step-out, DAP clients cannot
+
+**Godot 4.5 and earlier**:
+- ❌ No step-out in either editor or DAP
+- Consistent limitation across both interfaces
+
+**Technical Details**:
+- Editor implementation: PR #97758 (merged Nov 14, 2025)
+- DAP server missing `req_stepOut()` handler in `debug_adapter_parser.cpp`
+- Underlying infrastructure exists (depth tracking, execution control)
+- Estimated effort to add: ~10-20 lines of code (following `req_next` pattern)
+
+**Workarounds**:
+1. Set breakpoint after function call, use `continue`
+2. Step through remaining lines manually with `next`
+3. Switch to parent stack frame and set breakpoint there
+4. Notify user that stepOut is unavailable via DAP
+
+**Upstream Contribution Opportunity**:
+This is a small, high-impact feature that would benefit all DAP users (VS Code, Neovim, Claude Code, etc.). See our implementation notes in `docs/godot-upstream/` for contribution guidance.
+
+**References**:
+- Feature request: https://github.com/godotengine/godot-proposals/issues/2815
+- Editor implementation: https://github.com/godotengine/godot/pull/97758
+- DAP server code: `editor/debugger/debug_adapter/debug_adapter_parser.{h,cpp}`
 
 ### Q: Why don't I receive a "continued" event after continue?
 **A**: It's **asynchronous** - separate from response
