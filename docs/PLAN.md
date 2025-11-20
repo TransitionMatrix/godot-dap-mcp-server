@@ -188,7 +188,7 @@ This plan references detailed documentation in separate files:
    - Returns: Success status
    - Location: `internal/tools/execution.go`
 
-**⚠️ IMPORTANT**: `step_out` is **NOT implemented** in Godot's DAP server. See [GODOT_SOURCE_ANALYSIS.md](reference/GODOT_SOURCE_ANALYSIS.md).
+**⚠️ IMPORTANT**: `step_out` is **NOT implemented** in Godot's DAP server (as of 4.5.1). A PR has been submitted to the 4.x branch (https://github.com/godotengine/godot/pull/112875), but no specific milestone has been set yet. See [GODOT_SOURCE_ANALYSIS.md](reference/GODOT_SOURCE_ANALYSIS.md) for details.
 
 **Deliverables**:
 - ✅ 7 MCP tools for debugging
@@ -448,7 +448,7 @@ This plan references detailed documentation in separate files:
 ## Critical Findings
 
 ### stepOut Not Implemented
-⚠️ **Godot's DAP server does NOT implement stepOut command**. Do not attempt to implement `godot_step_out` tool. See [GODOT_SOURCE_ANALYSIS.md](reference/GODOT_SOURCE_ANALYSIS.md) for details.
+⚠️ **Godot's DAP server does NOT implement stepOut command** (as of 4.5.1). A PR has been submitted to the 4.x branch to add this functionality (https://github.com/godotengine/godot/pull/112875), but no specific release milestone has been set. Do not implement `godot_step_out` tool until the PR is merged. See [GODOT_SOURCE_ANALYSIS.md](reference/GODOT_SOURCE_ANALYSIS.md) for details.
 
 ### Launch Requires Two Steps
 The DAP `launch` request only stores parameters. Must send `configurationDone` to actually launch game. See [DAP_PROTOCOL.md](reference/DAP_PROTOCOL.md#launch-flow).

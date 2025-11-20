@@ -23,7 +23,9 @@ This document contains critical implementation details discovered from analyzing
 
 ### 🚨 CRITICAL
 
-**Finding**: Godot's DAP server **does not implement stepOut** command at all.
+**Finding**: Godot's DAP server **does not implement stepOut** command (as of 4.5.1).
+
+**Update**: A PR has been submitted to add stepOut support to the 4.x branch: https://github.com/godotengine/godot/pull/112875 (no milestone set yet).
 
 ### Evidence
 

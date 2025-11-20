@@ -1313,7 +1313,9 @@ This example shows a minimal debugging session with actual JSON messages:
 
 ## Not Supported: stepOut
 
-⚠️ **IMPORTANT**: Godot's DAP server does **NOT** implement the `stepOut` command.
+⚠️ **IMPORTANT**: Godot's DAP server does **NOT** implement the `stepOut` command (as of 4.5.1).
+
+**Status Update**: A PR has been submitted to add stepOut support to the 4.x branch: https://github.com/godotengine/godot/pull/112875 (no milestone set yet).
 
 **What is stepOut?**: Step out of current function (run until function returns)
 
@@ -1321,7 +1323,7 @@ This example shows a minimal debugging session with actual JSON messages:
 
 **Confirmed in**: `editor/debugger/debug_adapter/debug_adapter_parser.cpp`
 
-**Workarounds**:
+**Workarounds** (until PR merges):
 1. Set temporary breakpoint after function call, use `continue`
 2. Step through remaining lines manually with `next`
 3. Notify user that stepOut is unavailable

@@ -182,10 +182,15 @@ For full details, see [ARCHITECTURE.md - DAP Protocol Handshake Pattern](../ARCH
 3. Switch to parent stack frame and set breakpoint there
 4. Notify user that stepOut is unavailable via DAP
 
-**Upstream Contribution Opportunity**:
-This is a small, high-impact feature that would benefit all DAP users (VS Code, Neovim, Claude Code, etc.). See our implementation notes in `docs/godot-upstream/` for contribution guidance.
+**Upstream Contribution**:
+This is a small, high-impact feature that would benefit all DAP users (VS Code, Neovim, Claude Code, etc.).
+
+**Status**: ✅ **PR Submitted** - https://github.com/godotengine/godot/pull/112875
+
+The implementation adds stepOut support to Godot's DAP server, closing the feature parity gap between the editor UI and external DAP clients.
 
 **References**:
+- **Pending PR**: https://github.com/godotengine/godot/pull/112875 (stepOut DAP support)
 - Feature request: https://github.com/godotengine/godot-proposals/issues/2815
 - Editor implementation: https://github.com/godotengine/godot/pull/97758
 - DAP server code: `editor/debugger/debug_adapter/debug_adapter_parser.{h,cpp}`
