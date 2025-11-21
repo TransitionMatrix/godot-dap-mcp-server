@@ -1,7 +1,6 @@
 package mcp
 
 import (
-	"bufio"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -10,9 +9,9 @@ import (
 
 // Transport handles stdin/stdout communication for MCP protocol
 type Transport struct {
-	stdin  io.Reader
-	stdout io.Writer
-	scanner *bufio.Scanner
+	stdin   io.Reader
+	stdout  io.Writer
+	decoder *json.Decoder
 }
 
 // NewTransport creates a new transport using os.Stdin and os.Stdout
@@ -25,28 +24,18 @@ func NewTransportWithStreams(stdin io.Reader, stdout io.Writer) *Transport {
 	return &Transport{
 		stdin:   stdin,
 		stdout:  stdout,
-		scanner: bufio.NewScanner(stdin),
+		decoder: json.NewDecoder(stdin),
 	}
 }
 
 // ReadRequest reads and parses a single MCP request from stdin
 // Returns the parsed request or an error if reading/parsing fails
 func (t *Transport) ReadRequest() (*MCPRequest, error) {
-	// Read next line from stdin
-	if !t.scanner.Scan() {
-		// Check if scan failed due to error or EOF
-		if err := t.scanner.Err(); err != nil {
-			return nil, fmt.Errorf("failed to read from stdin: %w", err)
-		}
-		// EOF reached - clean shutdown
-		return nil, io.EOF
-	}
-
-	line := t.scanner.Bytes()
-
-	// Parse JSON-RPC request
 	var req MCPRequest
-	if err := json.Unmarshal(line, &req); err != nil {
+	if err := t.decoder.Decode(&req); err != nil {
+		if err == io.EOF {
+			return nil, io.EOF
+		}
 		return nil, fmt.Errorf("failed to parse JSON request: %w", err)
 	}
 
