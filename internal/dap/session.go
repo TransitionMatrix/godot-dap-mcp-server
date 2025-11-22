@@ -75,12 +75,9 @@ func (s *Session) InitializeSession(ctx context.Context) error {
 		return fmt.Errorf("failed to initialize: %w", err)
 	}
 
-	// Send configurationDone
-	if err := s.ConfigurationDone(ctx); err != nil {
-		s.client.Disconnect() // Clean up on error
-		s.state = StateDisconnected
-		return fmt.Errorf("failed to send configurationDone: %w", err)
-	}
+	// Note: ConfigurationDone is NOT sent here.
+	// It must be sent after the Launch request.
+	// See internal/tools/launch.go or godot_launch_* tools.
 
 	return nil
 }

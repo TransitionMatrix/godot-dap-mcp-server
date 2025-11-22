@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"log"
 	"net"
 	"sync"
@@ -87,35 +88,68 @@ func (c *Client) nextRequestSeq() int {
 	return seq
 }
 
-// read reads a single DAP message from the connection
-// This is a low-level method - use ReadWithTimeout for actual operations
+// read reads a message from the connection
 func (c *Client) read() (dap.Message, error) {
-	if !c.connected {
-		return nil, fmt.Errorf("not connected")
+	// Use the bufio reader that was initialized in Connect
+	reader := c.reader
+
+	// Read Content-Length header
+	// DAP headers are HTTP-like: "Content-Length: 123\r\n\r\n"
+	contentLength := 0
+	for {
+		line, err := reader.ReadString('\n')
+		if err != nil {
+			return nil, fmt.Errorf("failed to read header: %w", err)
+		}
+
+		// Remove trailing whitespace
+		line = line[:len(line)-2] // remove \r\n
+
+		if line == "" {
+			// Empty line marks end of headers
+			break
+		}
+
+		// Parse Content-Length
+		var length int
+		if n, _ := fmt.Sscanf(line, "Content-Length: %d", &length); n == 1 {
+			contentLength = length
+		}
 	}
 
-	// Read the base message (raw bytes)
-	data, err := dap.ReadBaseMessage(c.reader)
+	if contentLength == 0 {
+		return nil, fmt.Errorf("missing or invalid Content-Length header")
+	}
+
+	// Read body
+	body := make([]byte, contentLength)
+	_, err := io.ReadFull(reader, body)
 	if err != nil {
-		return nil, fmt.Errorf("failed to read base message: %w", err)
+		return nil, fmt.Errorf("failed to read body: %w", err)
 	}
 
-	// Decode the message using the codec
-	msg, err := c.codec.DecodeMessage(data)
-	if err != nil {
-		return nil, fmt.Errorf("failed to decode message: %w", err)
+	// Log incoming message (pretty printed)
+	var rawMsg map[string]interface{}
+	if err := json.Unmarshal(body, &rawMsg); err == nil {
+		if prettyBytes, err := json.MarshalIndent(rawMsg, "", "  "); err == nil {
+			log.Printf("[DAP IN]\n%s", string(prettyBytes))
+		} else {
+			log.Printf("[DAP IN] %s", string(body))
+		}
+	} else {
+		log.Printf("[DAP IN] %s", string(body))
 	}
 
-	return msg, nil
+	// Decode into specific type based on Type and Command/Event
+	return dap.DecodeProtocolMessage(body)
 }
 
-// write sends a DAP message to the connection
+// write sends a message to the connection
 func (c *Client) write(msg dap.Message) error {
 	if !c.connected {
 		return fmt.Errorf("not connected")
 	}
 
-	// DEBUG: Log the message being sent
 	if jsonBytes, err := json.MarshalIndent(msg, "", "  "); err == nil {
 		log.Printf("=== SENDING DAP MESSAGE ===\n%s\n=========================", string(jsonBytes))
 	}
@@ -164,6 +198,24 @@ func (c *Client) Initialize(ctx context.Context) (*dap.InitializeResponse, error
 	initResp, ok := response.(*dap.InitializeResponse)
 	if !ok {
 		return nil, fmt.Errorf("unexpected response type: %T", response)
+	}
+
+	// Wait for initialized event
+	// The DAP spec says the debugger sends this when it is ready to accept configuration
+	log.Println("Waiting for initialized event...")
+	for {
+		msg, err := c.ReadWithTimeout(ctx)
+		if err != nil {
+			return nil, fmt.Errorf("failed to receive initialized event: %w", err)
+		}
+
+		if _, ok := msg.(*dap.InitializedEvent); ok {
+			log.Println("Received initialized event")
+			break
+		}
+
+		// Log other events while waiting
+		c.logEvent(msg)
 	}
 
 	return initResp, nil
@@ -543,4 +595,126 @@ func (c *Client) Evaluate(ctx context.Context, expression string, frameId int, c
 	}
 
 	return evalResp, nil
+}
+
+// Launch sends a launch request to start the Godot game with specified parameters.
+// Note: The launch request only stores parameters. The game won't actually launch
+// until configurationDone() is called after this.
+//
+// Common arguments:
+//   - project: Absolute path to Godot project directory (must contain project.godot)
+//   - scene: "main" (project's main scene), "current" (editor's active scene), or "res://path/to/scene.tscn"
+//   - platform: "host" (default), "android", or "web"
+//   - noDebug: If true, breakpoints will be ignored
+//   - additional launch arguments can be passed in args map
+func (c *Client) Launch(ctx context.Context, args map[string]interface{}) (*dap.LaunchResponse, error) {
+	// Marshal arguments to JSON
+	argsJSON, err := json.Marshal(args)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal launch arguments: %w", err)
+	}
+
+	request := &dap.LaunchRequest{
+		Request: dap.Request{
+			ProtocolMessage: dap.ProtocolMessage{
+				Seq:  c.nextRequestSeq(),
+				Type: "request",
+			},
+			Command: "launch",
+		},
+		Arguments: argsJSON,
+	}
+
+	if err := c.write(request); err != nil {
+		return nil, fmt.Errorf("failed to send launch request: %w", err)
+	}
+
+	// Wait for launch response
+	response, err := c.waitForResponse(ctx, "launch")
+	if err != nil {
+		return nil, err
+	}
+
+	launchResp, ok := response.(*dap.LaunchResponse)
+	if !ok {
+		return nil, fmt.Errorf("unexpected response type: %T", response)
+	}
+
+	return launchResp, nil
+}
+
+// LaunchWithConfigurationDone sends a launch request followed immediately by configurationDone.
+// This is required for Godot, which only sends the launch response AFTER receiving configurationDone.
+func (c *Client) LaunchWithConfigurationDone(ctx context.Context, args map[string]interface{}) (*dap.LaunchResponse, error) {
+	// 1. Send Launch Request
+	argsJSON, err := json.Marshal(args)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal launch arguments: %w", err)
+	}
+
+	launchRequest := &dap.LaunchRequest{
+		Request: dap.Request{
+			ProtocolMessage: dap.ProtocolMessage{
+				Seq:  c.nextRequestSeq(),
+				Type: "request",
+			},
+			Command: "launch",
+		},
+		Arguments: argsJSON,
+	}
+
+	log.Println("DEBUG: Sending Launch Request...")
+	if err := c.write(launchRequest); err != nil {
+		return nil, fmt.Errorf("failed to send launch request: %w", err)
+	}
+	log.Println("DEBUG: Launch Request sent.")
+
+	// 2. Send ConfigurationDone Request
+	configDoneRequest := &dap.ConfigurationDoneRequest{
+		Request: dap.Request{
+			ProtocolMessage: dap.ProtocolMessage{
+				Seq:  c.nextRequestSeq(),
+				Type: "request",
+			},
+			Command: "configurationDone",
+		},
+	}
+
+	log.Println("DEBUG: Sending ConfigurationDone Request...")
+	if err := c.write(configDoneRequest); err != nil {
+		return nil, fmt.Errorf("failed to send configurationDone request: %w", err)
+	}
+	log.Println("DEBUG: ConfigurationDone Request sent.")
+
+	// 3. Wait for BOTH responses (in any order)
+	var launchResp *dap.LaunchResponse
+	var configDoneResp *dap.ConfigurationDoneResponse
+
+	// Loop until we have both responses
+	for launchResp == nil || configDoneResp == nil {
+		msg, err := c.ReadWithTimeout(ctx)
+		if err != nil {
+			return nil, err
+		}
+
+		switch m := msg.(type) {
+		case *dap.LaunchResponse:
+			if !m.Success {
+				return nil, fmt.Errorf("launch failed: %s", m.Message)
+			}
+			launchResp = m
+		case *dap.ConfigurationDoneResponse:
+			if !m.Success {
+				return nil, fmt.Errorf("configurationDone failed: %s", m.Message)
+			}
+			configDoneResp = m
+		case *dap.ErrorResponse:
+			return nil, fmt.Errorf("command failed: %s", m.Message)
+		default:
+			// Log other messages (events, etc.) and continue
+			c.logEvent(m)
+		}
+	}
+
+	return launchResp, nil
 }

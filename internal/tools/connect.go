@@ -104,18 +104,16 @@ Error: %w`, port, err)
 				return nil, fmt.Errorf("failed to initialize DAP session: %w", err)
 			}
 
-			// Complete the handshake with configurationDone
-			if err := session.ConfigurationDone(ctx); err != nil {
-				session.Close()
-				return nil, fmt.Errorf("failed to complete DAP configuration: %w", err)
-			}
+			// Note: We do NOT send configurationDone here.
+			// It must be sent AFTER the launch request.
+			// The session remains in 'initialized' state until a launch tool is called.
 
 			// Session is now ready for debugging
 			globalSession = session
 
 			return map[string]interface{}{
 				"status":  "connected",
-				"message": fmt.Sprintf("Connected to Godot DAP server at localhost:%d", port),
+				"message": fmt.Sprintf("Connected to Godot DAP server at localhost:%d. Ready to launch.", port),
 				"state":   session.GetState().String(),
 			}, nil
 		},

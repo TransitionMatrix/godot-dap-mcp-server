@@ -99,12 +99,12 @@ func (c *GodotLaunchConfig) Validate() error {
 // ToLaunchArgs converts the config to DAP launch request arguments
 func (c *GodotLaunchConfig) ToLaunchArgs() map[string]interface{} {
 	args := map[string]interface{}{
-		"project": c.Project,
-		"platform": string(c.Platform),
-		"noDebug": c.NoDebug,
-		"profiling": c.Profiling,
+		"project":          c.Project,
+		"platform":         string(c.Platform),
+		"noDebug":          c.NoDebug,
+		"profiling":        c.Profiling,
 		"debug_collisions": c.DebugCollisions,
-		"debug_paths": c.DebugPaths,
+		"debug_paths":      c.DebugPaths,
 		"debug_navigation": c.DebugNavigation,
 	}
 
@@ -133,8 +133,9 @@ func (s *Session) LaunchGodotScene(ctx context.Context, config *GodotLaunchConfi
 		return nil, fmt.Errorf("invalid launch configuration: %w", err)
 	}
 
-	// Launch with the converted arguments
-	return s.Launch(ctx, config.ToLaunchArgs())
+	// Launch with the converted arguments using the Godot-specific sequence
+	// (Launch -> ConfigurationDone -> Wait for ConfigDone -> Wait for Launch)
+	return s.client.LaunchWithConfigurationDone(ctx, config.ToLaunchArgs())
 }
 
 // LaunchMainScene is a convenience method to launch the project's main scene
