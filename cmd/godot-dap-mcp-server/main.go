@@ -9,10 +9,17 @@ import (
 )
 
 func main() {
-	// Configure logging to stderr (stdout is reserved for MCP protocol)
-	log.SetOutput(os.Stderr)
+	// Configure logging to file
+	logFile, err := os.OpenFile("/tmp/godot-dap-mcp-server.log", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+	if err != nil {
+		log.Printf("Failed to open log file: %v", err)
+	} else {
+		defer logFile.Close()
+		log.SetOutput(logFile)
+	}
 	log.SetFlags(log.Ldate | log.Ltime | log.Lshortfile)
 
+	log.Println("==========================================")
 	log.Println("Starting Godot DAP MCP Server...")
 
 	// Create MCP server

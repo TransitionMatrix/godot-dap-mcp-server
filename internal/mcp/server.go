@@ -56,6 +56,11 @@ func (s *Server) ListenAndServe() error {
 		// Handle request
 		resp := s.handleRequest(req)
 
+		// If request ID is nil, it's a notification - do not send response
+		if req.ID == nil {
+			continue
+		}
+
 		// Send response
 		if err := s.transport.WriteResponse(resp); err != nil {
 			log.Printf("Error writing response: %v", err)
@@ -67,6 +72,21 @@ func (s *Server) ListenAndServe() error {
 
 // handleRequest routes a request to the appropriate handler
 func (s *Server) handleRequest(req *MCPRequest) MCPResponse {
+	// Handle notifications that don't require a response
+	if req.ID == nil {
+		switch req.Method {
+		case "notifications/initialized":
+			// Just log and return empty response (which won't be sent)
+			log.Println("Client initialized notification received")
+			return MCPResponse{}
+		}
+	}
+
+	var id interface{}
+	if req.ID != nil {
+		id = *req.ID
+	}
+
 	switch req.Method {
 	case "tools/list":
 		return s.handleToolsList(req)
@@ -75,13 +95,18 @@ func (s *Server) handleRequest(req *MCPRequest) MCPResponse {
 	case "initialize":
 		return s.handleInitialize(req)
 	default:
-		return s.errorResponse(req.ID, -32601, fmt.Sprintf("method not found: %s", req.Method))
+		return s.errorResponse(id, -32601, fmt.Sprintf("method not found: %s", req.Method))
 	}
 }
 
 // handleInitialize handles the initialize method (optional but good practice)
 func (s *Server) handleInitialize(req *MCPRequest) MCPResponse {
-	return s.successResponse(req.ID, map[string]interface{}{
+	var id interface{}
+	if req.ID != nil {
+		id = *req.ID
+	}
+
+	return s.successResponse(id, map[string]interface{}{
 		"protocolVersion": "2024-11-05",
 		"capabilities": map[string]interface{}{
 			"tools": map[string]interface{}{},
@@ -125,21 +150,31 @@ func (s *Server) handleToolsList(req *MCPRequest) MCPResponse {
 		})
 	}
 
-	return s.successResponse(req.ID, ToolListResult{Tools: tools})
+	var id interface{}
+	if req.ID != nil {
+		id = *req.ID
+	}
+
+	return s.successResponse(id, ToolListResult{Tools: tools})
 }
 
 // handleToolsCall handles the tools/call method
 func (s *Server) handleToolsCall(req *MCPRequest) MCPResponse {
+	var id interface{}
+	if req.ID != nil {
+		id = *req.ID
+	}
+
 	// Extract tool name
 	name, ok := req.Params["name"].(string)
 	if !ok {
-		return s.errorResponse(req.ID, -32602, "missing or invalid 'name' parameter")
+		return s.errorResponse(id, -32602, "missing or invalid 'name' parameter")
 	}
 
 	// Find tool
 	tool, exists := s.tools[name]
 	if !exists {
-		return s.errorResponse(req.ID, -32601, fmt.Sprintf("tool not found: %s", name))
+		return s.errorResponse(id, -32601, fmt.Sprintf("tool not found: %s", name))
 	}
 
 	// Extract arguments
@@ -151,13 +186,13 @@ func (s *Server) handleToolsCall(req *MCPRequest) MCPResponse {
 	// Apply defaults and validate required parameters
 	params := s.applyDefaults(tool, arguments)
 	if err := s.validateRequired(tool, params); err != nil {
-		return s.errorResponse(req.ID, -32602, err.Error())
+		return s.errorResponse(id, -32602, err.Error())
 	}
 
 	// Call tool handler
 	result, err := tool.Handler(params)
 	if err != nil {
-		return s.errorResponse(req.ID, -32000, fmt.Sprintf("tool execution failed: %v", err))
+		return s.errorResponse(id, -32000, fmt.Sprintf("tool execution failed: %v", err))
 	}
 
 	// Format result as tool call result
@@ -170,7 +205,7 @@ func (s *Server) handleToolsCall(req *MCPRequest) MCPResponse {
 		},
 	}
 
-	return s.successResponse(req.ID, toolResult)
+	return s.successResponse(id, toolResult)
 }
 
 // applyDefaults applies default values to parameters
