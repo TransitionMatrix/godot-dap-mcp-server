@@ -142,6 +142,18 @@ for tool in "${PHASE4_TOOLS[@]}"; do
         exit 1
     fi
 done
+
+# Check for Phase 5 tools (Launch Tools)
+PHASE5_TOOLS=("godot_launch_main_scene" "godot_launch_scene" "godot_launch_current_scene")
+echo "  Phase 5 (Launch Tools):"
+for tool in "${PHASE5_TOOLS[@]}"; do
+    if echo "$TOOLS_RESPONSE" | grep -q "$tool"; then
+        echo -e "${GREEN}    ✓ $tool${NC}"
+    else
+        echo -e "${RED}    ✗ $tool missing${NC}"
+        exit 1
+    fi
+done
 echo ""
 
 # Test 3: Connect to Godot DAP server
