@@ -44,8 +44,11 @@
   - Project path validation
   - Unit tests passing
   - Integration verification of tool registration
-- ✅ **Phase 6: Advanced Tools** - COMPLETE (2025-11-24)
-  - `godot_pause` timeout issue resolved by correctly handling `PauseResponse` in DAP client.
+- ⏳ **Phase 6: Advanced Tools** - PARTIALLY COMPLETE
+  - ✅ `godot_pause`: Implemented and verified (timeout fixed).
+  - ⚠️ `godot_set_variable`: Implemented via `evaluate` workaround but needs rigorous verification.
+  - 🔲 Robust Event Handling: Needs state machine refactor to handle async DAP events correctly (prioritization, state updates from events).
+
 - 🔲 **Phase 7: Error Handling & Polish** - PENDING
 - 🔲 **Phase 8: Documentation** - PENDING
 
@@ -289,34 +292,34 @@ This plan references detailed documentation in separate files:
 
 ---
 
-### Phase 6: Advanced Tools - ✅ COMPLETE
+### Phase 6: Advanced Tools - ⏳ PARTIALLY COMPLETE
 
 **Goal**: Add nice-to-have debugging tools
 
 **Tools Implemented** (2 tools):
 1. ✅ `godot_pause` - Pause execution of running game
-2. ✅ `godot_set_variable` - Modify variable at runtime (via evaluate() workaround)
+2. ⚠️ `godot_set_variable` - Modify variable at runtime (via evaluate() workaround). Implemented but needs integration testing.
 
 **Tools Skipped** (documented patterns instead):
 3. ❌ `godot_get_scene_tree` - Not needed, use existing `godot_get_variables` (see updated description)
 4. ❌ `godot_inspect_node` - Already works via `godot_get_variables` object expansion
 
 **Implementation Notes**:
-- **Pause**: Fully implemented in Godot, triggers `stopped` event with `reason="pause"`
+- **Pause**: Fully implemented in Godot, triggers `stopped` event with `reason="pause"`. Fixed timeout issue by correctly handling `PauseResponse`.
 - **SetVariable**: Godot advertises support but doesn't implement it! Used `evaluate()` workaround with strict security validation
 - **Scene Tree**: No dedicated command in Godot; navigation pattern documented in `godot_get_variables` description
 - **Node Inspection**: Already works through object expansion with Node/* property categorization
 
-**Success Criteria**: ✅ All Met
+**Success Criteria**: ⚠️ Partially Met
 - ✅ Can pause running game
-- ✅ Can modify variables at runtime (with security validation)
+- ❓ Can modify variables at runtime (with security validation)
 - ✅ Can inspect scene tree structure (via existing tools)
 - ✅ Can inspect node properties (via existing object expansion)
 - ✅ No security vulnerabilities in variable setting
 - ✅ Clear error messages on failure
 
 **Commit**: [To be added]
-**Date Completed**: 2025-11-08
+**Date Completed**: [Pending Verification]
 
 ---
 
@@ -377,7 +380,7 @@ This plan references detailed documentation in separate files:
 | 3. Core Debugging Tools | 1 | HIGH | ✅ COMPLETE | 7 essential tools + tests |
 | 4. Inspection Tools | 1 | HIGH | 🔲 PENDING | 5 inspection tools |
 | 5. Launch Tools | 1 | MEDIUM | ✅ COMPLETE | 3 launch variants |
-| 6. Advanced Tools | 1 | OPTIONAL | 🔲 PENDING | 4 nice-to-have tools |
+| 6. Advanced Tools | 1 | OPTIONAL | ⏳ PARTIAL | 4 nice-to-have tools |
 | 7. Error Handling | 1 | CRITICAL | 🔲 PENDING | Timeouts, recovery, paths |
 | 8. Documentation | 1 | HIGH | 🔲 PENDING | Complete docs |
 | **Total** | **4-5 days** | | | **Production-ready server** |
@@ -388,7 +391,7 @@ This plan references detailed documentation in separate files:
 
 ### Functional Metrics
 - ✅ All core debugging tools working (connect, breakpoints, stepping, inspection)
-- ⏳ Launch functionality working (main, custom, current scenes)
+- ✅ Launch functionality working (main, custom, current scenes)
 - ⏳ No permanent hangs (timeout mechanisms working)
 - ⏳ Clear error messages on failure
 
@@ -409,27 +412,19 @@ This plan references detailed documentation in separate files:
 
 ## Next Steps
 
-### Immediate Actions (Phase 3)
+### Immediate Actions (Phase 6 & 7)
 
-1. **Implement `godot_connect` tool**
-   - Create `internal/tools/connect.go`
-   - Use Phase 2 Session to establish connection
-   - Return connection status and capabilities
+1. **Robust Event Handling (Based on Log Analysis)**:
+   - **Prioritization**: Prioritize `Terminated`, `Exited`, `Stopped` events over `Output` to prevent UI hangs.
+   - **State Management**: Transition state based on `Stopped`/`Continued` events, not just requests.
+   - **Performance**: Throttle `Output` events to prevent stdio flooding.
+   - **Safety**: Handle malformed events gracefully without crashing.
 
-2. **Implement execution control tools**
-   - `godot_continue`, `godot_step_over`, `godot_step_into`
-   - Use DAP client methods from Phase 2
-   - Handle async events properly
+2. **Verify `godot_set_variable`**:
+   - Create integration test to modify a variable and verify change.
 
-3. **Implement breakpoint tools**
-   - `godot_set_breakpoint`, `godot_clear_breakpoint`
-   - Use absolute paths (validate)
-   - Handle Godot's path requirements
-
-4. **Testing**
-   - Add unit tests for each tool
-   - Create integration test with running Godot
-   - Verify end-to-end workflow
+3. **Path Resolution**:
+   - Implement `res://` to absolute path conversion.
 
 **See**: [IMPLEMENTATION_GUIDE.md](IMPLEMENTATION_GUIDE.md) for implementation patterns
 
@@ -464,12 +459,15 @@ The DAP `launch` request only stores parameters. Must send `configurationDone` t
 ### Event Filtering is Critical
 DAP sends async events mixed with responses. Event filtering pattern (in Phase 2) is essential to prevent hangs. See [ARCHITECTURE.md](ARCHITECTURE.md#critical-implementation-patterns).
 
+### Explicit Response Handling Required
+The `go-dap` library returns specific struct types (e.g., `*dap.PauseResponse`) which must be explicitly handled in type switches. Generic `*dap.Response` handling is insufficient and leads to timeouts.
+
 ---
 
 ## Questions & Answers
 
 **Q: Can I test anything end-to-end yet?**
-**A**: After Phase 2, only Phase 1 MCP server (godot_ping) is testable. Phase 3 will add first real debugging tools.
+**A**: Yes, core debugging loop (Launch -> Pause -> Inspect -> Step) is verified working.
 
 **Q: Where do I find detailed implementation specs?**
 **A**: See [IMPLEMENTATION_GUIDE.md](IMPLEMENTATION_GUIDE.md) for complete component specifications with code examples.
@@ -483,6 +481,15 @@ DAP sends async events mixed with responses. Event filtering pattern (in Phase 2
 ---
 
 ## Future Work
+
+### Robust Async Event Handling
+
+**Analysis**: Logs show Godot sends many async events (output, thread, process) interleaved with responses.
+**Recommendations**:
+1. **Event Prioritization**: Process `Stopped`/`Terminated` before `Output`.
+2. **Event-Driven State**: Update session state based on events, not just commands.
+3. **Output Throttling**: Buffer/debounce high-volume output events.
+4. **Mock Testing**: Use a mock DAP server to test race conditions and flooding.
 
 ### Godot-Specific DAP Extensions
 
@@ -511,5 +518,5 @@ Godot provides a non-standard DAP extension (`godot/custom_data`) that forwards 
 
 ---
 
-**Last Updated**: 2025-11-14
-**Project Status**: Phases 1-4 Complete, Phase 6 Complete, Phases 5, 7-8 Pending
+**Last Updated**: 2025-11-24
+**Project Status**: Phases 1-5 Complete, Phase 6 Partially Complete, Phases 7-8 Pending
