@@ -132,12 +132,12 @@ func (c *Client) read() (dap.Message, error) {
 	var rawMsg map[string]interface{}
 	if err := json.Unmarshal(body, &rawMsg); err == nil {
 		if prettyBytes, err := json.MarshalIndent(rawMsg, "", "  "); err == nil {
-			log.Printf("[DAP IN]\n%s", string(prettyBytes))
+			log.Printf("[DAP RCVD] %s", string(prettyBytes))
 		} else {
-			log.Printf("[DAP IN] %s", string(body))
+			log.Printf("[DAP RCVD] %s", string(body))
 		}
 	} else {
-		log.Printf("[DAP IN] %s", string(body))
+		log.Printf("[DAP RCVD] %s", string(body))
 	}
 
 	// Decode into specific type based on Type and Command/Event
@@ -151,10 +151,121 @@ func (c *Client) write(msg dap.Message) error {
 	}
 
 	if jsonBytes, err := json.MarshalIndent(msg, "", "  "); err == nil {
-		log.Printf("=== SENDING DAP MESSAGE ===\n%s\n=========================", string(jsonBytes))
+		log.Printf("[DAP SENT] %s", string(jsonBytes))
+	} else {
+		log.Printf("[DAP SENT] (failed to marshal for logging): %v", msg)
 	}
 
 	return dap.WriteProtocolMessage(c.conn, msg)
+}
+
+// waitForResponse waits for a response to a specific command
+func (c *Client) waitForResponse(ctx context.Context, expectedCommand string) (dap.Message, error) {
+	log.Printf("Waiting for response to command: %s", expectedCommand)
+	for {
+		msg, err := c.ReadWithTimeout(ctx)
+		if err != nil {
+			return nil, err
+		}
+
+		switch m := msg.(type) {
+		case *dap.Response:
+			if m.Command == expectedCommand {
+				log.Printf("Received expected response for %s: Success=%v", m.Command, m.Success)
+				if !m.Success {
+					return nil, fmt.Errorf("command %s failed: %s", m.Command, m.Message)
+				}
+				return m, nil
+			}
+			log.Printf("Received response for different command: %s (waiting for %s)", m.Command, expectedCommand)
+
+		case *dap.ErrorResponse:
+			log.Printf("Received ErrorResponse for command %s: %s", m.Command, m.Message)
+			// If this is the error for our command, fail immediately
+			if m.Command == expectedCommand {
+				return nil, fmt.Errorf("command %s returned error: %s", expectedCommand, m.Message)
+			}
+
+		case *dap.Event:
+			log.Printf("Received Event while waiting: %s", m.Event)
+			c.logEvent(m)
+
+		// Specific response types
+		case *dap.InitializeResponse:
+			if expectedCommand == "initialize" {
+				return m, nil
+			}
+		case *dap.ConfigurationDoneResponse:
+			if expectedCommand == "configurationDone" {
+				return m, nil
+			}
+		case *dap.LaunchResponse:
+			if expectedCommand == "launch" {
+				return m, nil
+			}
+		case *dap.SetBreakpointsResponse:
+			if expectedCommand == "setBreakpoints" {
+				return m, nil
+			}
+		case *dap.ContinueResponse:
+			if expectedCommand == "continue" {
+				return m, nil
+			}
+		case *dap.NextResponse:
+			if expectedCommand == "next" {
+				return m, nil
+			}
+		case *dap.StepInResponse:
+			if expectedCommand == "stepIn" {
+				return m, nil
+			}
+		case *dap.StepOutResponse:
+			if expectedCommand == "stepOut" {
+				return m, nil
+			}
+		case *dap.PauseResponse:
+			if expectedCommand == "pause" {
+				return m, nil
+			}
+		case *dap.ThreadsResponse:
+			if expectedCommand == "threads" {
+				return m, nil
+			}
+		case *dap.StackTraceResponse:
+			if expectedCommand == "stackTrace" {
+				return m, nil
+			}
+		case *dap.ScopesResponse:
+			if expectedCommand == "scopes" {
+				return m, nil
+			}
+		case *dap.VariablesResponse:
+			if expectedCommand == "variables" {
+				return m, nil
+			}
+		case *dap.EvaluateResponse:
+			if expectedCommand == "evaluate" {
+				return m, nil
+			}
+		case *dap.SetVariableResponse:
+			if expectedCommand == "setVariable" {
+				return m, nil
+			}
+		case *dap.DisconnectResponse:
+			if expectedCommand == "disconnect" {
+				return m, nil
+			}
+
+		default:
+			// Handle specific event types that don't implement *dap.Event
+			if event, ok := msg.(dap.EventMessage); ok {
+				log.Printf("Received EventMessage while waiting: %s", event.GetEvent())
+				c.logEvent(msg)
+			} else {
+				log.Printf("Received unknown message type: %T", msg)
+			}
+		}
+	}
 }
 
 // Initialize sends the initialize request to the DAP server

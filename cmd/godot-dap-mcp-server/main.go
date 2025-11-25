@@ -10,7 +10,7 @@ import (
 
 func main() {
 	// Configure logging to file
-	logFile, err := os.OpenFile("/tmp/godot-dap-mcp-server.log", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+	logFile, err := os.OpenFile("godot-dap-debug.log", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
 	if err != nil {
 		log.Printf("Failed to open log file: %v", err)
 	} else {
