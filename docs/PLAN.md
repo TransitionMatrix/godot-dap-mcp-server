@@ -412,19 +412,18 @@ This plan references detailed documentation in separate files:
 
 ## Next Steps
 
-### Immediate Actions (Phase 6 & 7)
+### Immediate Actions (Phase 6 Verification)
 
-1. **Robust Event Handling (Based on Log Analysis)**: See also [DAP_EVENT_ANALYSIS.md](docs/implementation-notes/DAP_EVENT_ANALYSIS.md) for detailed analysis and strategy.
-   - **Prioritization**: Prioritize `Terminated`, `Exited`, `Stopped` events over `Output` to prevent UI hangs.
-   - **State Management**: Transition state based on `Stopped`/`Continued` events, not just requests.
-   - **Performance**: Throttle `Output` events to prevent stdio flooding.
-   - **Safety**: Handle malformed events gracefully without crashing.
-
-2. **Verify `godot_set_variable`**:
+1. **Verify `godot_set_variable`**:
    - Create integration test to modify a variable and verify change.
 
-3. **Path Resolution**:
-   - Implement `res://` to absolute path conversion.
+### Next Phase (Phase 7 Implementation)
+
+1. **Mock DAP Server**:
+   - Build `pkg/daptest` to facilitate TDD for event handling.
+
+2. **State Machine Refactor**:
+   - Update `Session` to listen to `Stopped`/`Continued` events.
 
 **See**: [IMPLEMENTATION_GUIDE.md](IMPLEMENTATION_GUIDE.md) for implementation patterns
 
@@ -482,15 +481,6 @@ The `go-dap` library returns specific struct types (e.g., `*dap.PauseResponse`) 
 
 ## Future Work
 
-### Robust Async Event Handling
-
-**Analysis**: Logs show Godot sends many async events (output, thread, process) interleaved with responses.
-**Recommendations**:
-1. **Event Prioritization**: Process `Stopped`/`Terminated` before `Output`.
-2. **Event-Driven State**: Update session state based on events, not just commands.
-3. **Output Throttling**: Buffer/debounce high-volume output events.
-4. **Mock Testing**: Use a mock DAP server to test race conditions and flooding.
-
 ### Godot-Specific DAP Extensions
 
 **Investigation**: `godot/custom_data` Event Handling
@@ -519,4 +509,4 @@ Godot provides a non-standard DAP extension (`godot/custom_data`) that forwards 
 ---
 
 **Last Updated**: 2025-11-24
-**Project Status**: Phases 1-5 Complete, Phase 6 Partially Complete, Phases 7-8 Pending
+**Project Status**: Phases 1-5 Complete, Phase 6 Partially Complete, Phases 7-9 Pending
