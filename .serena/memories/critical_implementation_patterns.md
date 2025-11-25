@@ -34,37 +34,66 @@ client.WaitForLaunchAndConfigDone()
 - `godot_launch_*` handles the `Launch` -> `ConfigurationDone` sequence.
 - `LaunchWithConfigurationDone` method handles the specific ordering Godot requires.
 
-## 2. Event Filtering Pattern (DAP Client)
+## 2. Event and Response Handling Pattern (DAP Client)
 
-**Problem**: Godot's DAP server sends async events (stopped, continued, output, etc.) mixed with command responses. Reading without filtering will return events instead of expected responses.
+**Problem**: Godot's DAP server sends async events (stopped, continued, output, etc.) mixed with command responses. Additionally, the `go-dap` library decodes messages into specific response types (e.g., `*dap.PauseResponse`, `*dap.LaunchResponse`), which must be explicitly handled in `waitForResponse` to avoid unexpected type assertions and timeouts.
 
-**Solution**: Always filter for expected response type (Phase 6 refinement adds ErrorResponse handling)
+**Solution**: Implement robust `waitForResponse` that filters events and explicitly handles all expected DAP response types.
+
 ```go
-func (c *Client) waitForResponse(ctx context.Context, expectedCommand string) (*dap.Response, error) {
+func (c *Client) waitForResponse(ctx context.Context, expectedCommand string) (dap.Message, error) {
     for {
         msg, err := c.ReadWithTimeout(ctx)
         // ... error handling ...
 
         switch m := msg.(type) {
         case *dap.Response:
+            // Generic DAP response. Check its command field.
             if m.Command == expectedCommand {
                 return m, nil
             }
         case *dap.ErrorResponse:
-            return nil, fmt.Errorf("command %s error: %s", command, m.Message)
+            // Handle error responses directly.
+            if m.Command == expectedCommand {
+                return nil, fmt.Errorf("command %s error: %s", command, m.Message)
+            }
         case *dap.Event:
-            c.logEvent(m) // Log and continue waiting
-            // ... handle specific events ...
+            // Log known events and continue waiting.
+            c.logEvent(m)
+            
+        // Explicitly handle specific DAP response types to match expectedCommand
+        case *dap.InitializeResponse:
+            if expectedCommand == "initialize" { return m, nil }
+        case *dap.ConfigurationDoneResponse:
+            if expectedCommand == "configurationDone" { return m, nil }
+        case *dap.LaunchResponse:
+            if expectedCommand == "launch" { return m, nil }
+        case *dap.SetBreakpointsResponse:
+            if expectedCommand == "setBreakpoints" { return m, nil }
+        case *dap.ContinueResponse:
+            if expectedCommand == "continue" { return m, nil }
+        case *dap.NextResponse:
+            if expectedCommand == "next" { return m, nil }
+        case *dap.StepInResponse:
+            if expectedCommand == "stepIn" { return m, nil }
+        case *dap.PauseResponse: // ✅ New: Correctly handles PauseResponse
+            if expectedCommand == "pause" { return m, nil }
+        // ... other specific response types ...
+
+        default:
+            // Log unknown messages or other event types that might not implement *dap.Event
+            c.logEvent(m) // Fallback for various event types
         }
     }
 }
 ```
 
 **Key Points**:
-- Never return on first message - it might be an event
-- Loop until expected response arrives
-- ErrorResponse returns error immediately (no retry)
-- Log events but don't treat them as responses
+- Never return on first message - it might be an event or a response for another command.
+- Loop until the exact `expectedCommand` response is received.
+- `ErrorResponse` returns an error immediately.
+- Log events and unexpected responses, but continue waiting for the target response.
+- **Critical**: Explicitly `case` match all specific `*dap.XxxResponse` types returned by the `go-dap` library to ensure correct type assertion and command matching. This was the fix for `godot_pause` timeout.
 
 ## 3. Timeout Protection Pattern
 
