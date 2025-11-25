@@ -414,7 +414,7 @@ This plan references detailed documentation in separate files:
 
 ### Immediate Actions (Phase 6 & 7)
 
-1. **Robust Event Handling (Based on Log Analysis)**:
+1. **Robust Event Handling (Based on Log Analysis)**: See also [DAP_EVENT_ANALYSIS.md](docs/implementation-notes/DAP_EVENT_ANALYSIS.md) for detailed analysis and strategy.
    - **Prioritization**: Prioritize `Terminated`, `Exited`, `Stopped` events over `Output` to prevent UI hangs.
    - **State Management**: Transition state based on `Stopped`/`Continued` events, not just requests.
    - **Performance**: Throttle `Output` events to prevent stdio flooding.
