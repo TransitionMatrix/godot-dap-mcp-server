@@ -44,19 +44,29 @@
   - Project path validation
   - Unit tests passing
   - Integration verification of tool registration
-- ❌ **Phase 6: Advanced Tools** - PARTIALLY COMPLETE (godot_set_variable blocked)
+- ❌ **Phase 6: Advanced Tools** - PARTIALLY COMPLETE (godot_set_variable broken)
   - ✅ `godot_pause`: Implemented and verified (timeout fixed).
-  - ❌ `godot_set_variable`: **IMPOSSIBLE**. Confirmed via source analysis that Godot advertises `supportsSetVariable` but provides no implementation. Workarounds via `evaluate` fail because `Expression` class cannot handle assignments. See [GODOT_SOURCE_ANALYSIS.md](docs/reference/GODOT_SOURCE_ANALYSIS.md).
+  - ❌ `godot_set_variable`: **NON-FUNCTIONAL**. Godot advertises `supportsSetVariable` but provides no implementation. Workarounds via `evaluate` fail because `Expression` class cannot handle assignments. See [GODOT_SOURCE_ANALYSIS.md](docs/reference/GODOT_SOURCE_ANALYSIS.md).
 
-- 🔲 **Phase 7: Architecture Refactor (Event Handling)** - HIGH PRIORITY
-  - Implement Event-Driven State Machine (transition on events, not requests).
-  - Implement Priority Event Queue (Stop/Terminate > Output).
-  - Implement Output Throttling.
-  - Verify with Mock DAP Server.
-  - **Revisit `godot_set_variable`:** If a direct `setVariable` request is found to be functional despite advertised capabilities, implement and integrate it here.
+- ✅ **Phase 7: Architecture Refactor (Event Handling)** - COMPLETE (2025-11-25)
+  - Implemented Event-Driven State Machine (transition on events, not requests).
+  - Implemented Priority Event Queue (Response vs Event dispatch).
+  - Implemented Output Throttling (via buffer dropping).
+  - Verified with Mock DAP Server (`pkg/daptest`).
+  - Confirmed robust handling of interleaved events (`process` + `configurationDone`).
 
-- 🔲 **Phase 8: Error Handling & Polish** - PENDING
-- 🔲 **Phase 9: Documentation** - PENDING
+- ✅ **Phase 8: Error Handling & Polish** - COMPLETE (2025-11-25)
+  - Timeout Implementation: All DAP requests wrapped with timeouts.
+  - Error Message Formatting: Implemented `FormatError` with Problem/Context/Solution pattern.
+  - Graceful Degradation: Handled connection loss and session recovery.
+  - Logging: Implemented structured logging (stderr by default, file via env var).
+  - Path Resolution: Implemented `res://` -> absolute path conversion with `project` arg in `godot_connect`.
+
+- ✅ **Phase 9: Documentation** - COMPLETE (2025-11-25)
+  - README.md updated.
+  - docs/TOOLS.md created.
+  - docs/EXAMPLES.md created.
+  - CHANGELOG.md created.
 
 ---
 
@@ -513,7 +523,19 @@ Godot provides a non-standard DAP extension (`godot/custom_data`) that forwards 
 
 **Priority**: Low (Nice-to-have for advanced features)
 
+### Upstream Contributions
+
+**Task**: Implement `setVariable` in Godot Engine
+
+The `setVariable` command is advertised but missing in Godot's DAP server.
+
+**Plan**:
+1. Implement `req_setVariable` in `debug_adapter_parser.cpp`.
+2. Map it to `ScriptEditorDebugger::live_debug_set_node_property` or similar internal method.
+3. Verify against `test-dap-protocol` suite.
+4. Submit PR to Godot Engine.
+
 ---
 
-**Last Updated**: 2025-11-24
+**Last Updated**: 2025-11-25
 **Project Status**: Phases 1-5 Complete, Phase 6 Partially Complete, Phases 7-9 Pending
