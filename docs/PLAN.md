@@ -44,13 +44,19 @@
   - Project path validation
   - Unit tests passing
   - Integration verification of tool registration
-- ⏳ **Phase 6: Advanced Tools** - PARTIALLY COMPLETE
+- ❌ **Phase 6: Advanced Tools** - PARTIALLY COMPLETE (godot_set_variable blocked)
   - ✅ `godot_pause`: Implemented and verified (timeout fixed).
-  - ⚠️ `godot_set_variable`: Implemented via `evaluate` workaround but needs rigorous verification.
-  - 🔲 Robust Event Handling: Needs state machine refactor to handle async DAP events correctly (prioritization, state updates from events).
+  - ❌ `godot_set_variable`: **IMPOSSIBLE**. Confirmed via source analysis that Godot advertises `supportsSetVariable` but provides no implementation. Workarounds via `evaluate` fail because `Expression` class cannot handle assignments. See [GODOT_SOURCE_ANALYSIS.md](docs/reference/GODOT_SOURCE_ANALYSIS.md).
 
-- 🔲 **Phase 7: Error Handling & Polish** - PENDING
-- 🔲 **Phase 8: Documentation** - PENDING
+- 🔲 **Phase 7: Architecture Refactor (Event Handling)** - HIGH PRIORITY
+  - Implement Event-Driven State Machine (transition on events, not requests).
+  - Implement Priority Event Queue (Stop/Terminate > Output).
+  - Implement Output Throttling.
+  - Verify with Mock DAP Server.
+  - **Revisit `godot_set_variable`:** If a direct `setVariable` request is found to be functional despite advertised capabilities, implement and integrate it here.
+
+- 🔲 **Phase 8: Error Handling & Polish** - PENDING
+- 🔲 **Phase 9: Documentation** - PENDING
 
 ---
 
@@ -380,10 +386,11 @@ This plan references detailed documentation in separate files:
 | 3. Core Debugging Tools | 1 | HIGH | ✅ COMPLETE | 7 essential tools + tests |
 | 4. Inspection Tools | 1 | HIGH | 🔲 PENDING | 5 inspection tools |
 | 5. Launch Tools | 1 | MEDIUM | ✅ COMPLETE | 3 launch variants |
-| 6. Advanced Tools | 1 | OPTIONAL | ⏳ PARTIAL | 4 nice-to-have tools |
-| 7. Error Handling | 1 | CRITICAL | 🔲 PENDING | Timeouts, recovery, paths |
-| 8. Documentation | 1 | HIGH | 🔲 PENDING | Complete docs |
-| **Total** | **4-5 days** | | | **Production-ready server** |
+| 6. Advanced Tools | 1 | OPTIONAL | ❌ NON-FUNCTIONAL | godot_set_variable is broken |
+| 7. Event Arch Refactor | 2 | CRITICAL | 🔲 PENDING | Robust event handling |
+| 8. Error Handling | 1 | HIGH | 🔲 PENDING | Timeouts, recovery, paths |
+| 9. Documentation | 1 | HIGH | 🔲 PENDING | Complete docs |
+| **Total** | **6-7 days** | | | **Production-ready server** |
 
 ---
 
