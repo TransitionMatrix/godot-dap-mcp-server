@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"sync"
 )
 
 // Transport handles stdin/stdout communication for MCP protocol
@@ -12,6 +13,7 @@ type Transport struct {
 	stdin   io.Reader
 	stdout  io.Writer
 	decoder *json.Decoder
+	mu      sync.Mutex
 }
 
 // NewTransport creates a new transport using os.Stdin and os.Stdout
@@ -49,6 +51,9 @@ func (t *Transport) ReadRequest() (*MCPRequest, error) {
 
 // WriteResponse writes an MCP response to stdout
 func (t *Transport) WriteResponse(resp MCPResponse) error {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+
 	// Ensure JSON-RPC version is set
 	resp.JSONRPC = "2.0"
 

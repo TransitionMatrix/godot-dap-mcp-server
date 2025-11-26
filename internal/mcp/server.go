@@ -53,20 +53,21 @@ func (s *Server) ListenAndServe() error {
 			continue
 		}
 
-		// Handle request
-		resp := s.handleRequest(req)
+		// Handle request asynchronously to prevent blocking
+		go func(r *MCPRequest) {
+			// Handle request
+			resp := s.handleRequest(r)
 
-		// If request ID is nil, it's a notification - do not send response
-		if req.ID == nil {
-			continue
-		}
+			// If request ID is nil, it's a notification - do not send response
+			if r.ID == nil {
+				return
+			}
 
-		// Send response
-		if err := s.transport.WriteResponse(resp); err != nil {
-			log.Printf("Error writing response: %v", err)
-			// If we can't write responses, we should shut down
-			return fmt.Errorf("failed to write response: %w", err)
-		}
+			// Send response (transport is now thread-safe)
+			if err := s.transport.WriteResponse(resp); err != nil {
+				log.Printf("Error writing response: %v", err)
+			}
+		}(req)
 	}
 }
 
