@@ -9,6 +9,7 @@ import (
 	"log"
 	"net"
 	"sync"
+	"time"
 
 	"github.com/google/go-dap"
 )
@@ -25,6 +26,14 @@ type Client struct {
 	mu      sync.Mutex
 	nextSeq int
 
+	// Pending requests (seq -> channel)
+	pendingReqs map[int]chan dap.Message
+	reqMu       sync.Mutex
+
+	// Event listeners
+	eventListeners []chan dap.Message
+	eventMu        sync.Mutex
+
 	// Connection state
 	connected bool
 }
@@ -32,10 +41,12 @@ type Client struct {
 // NewClient creates a new DAP client for connecting to Godot
 func NewClient(host string, port int) *Client {
 	return &Client{
-		host:    host,
-		port:    port,
-		nextSeq: 1,
-		codec:   dap.NewCodec(),
+		host:           host,
+		port:           port,
+		nextSeq:        1,
+		codec:          dap.NewCodec(),
+		pendingReqs:    make(map[int]chan dap.Message),
+		eventListeners: make([]chan dap.Message, 0),
 	}
 }
 
@@ -58,7 +69,129 @@ func (c *Client) Connect(ctx context.Context) error {
 	c.reader = bufio.NewReader(conn)
 	c.connected = true
 
+	// Start background read loop
+	go c.readLoop()
+
 	return nil
+}
+
+// readLoop continuously reads messages from the connection
+func (c *Client) readLoop() {
+	for {
+		msg, err := c.read()
+		if err != nil {
+			if c.connected {
+				log.Printf("Connection error: %v", err)
+				c.connected = false
+			}
+			return
+		}
+		c.handleMessage(msg)
+	}
+}
+
+// handleMessage dispatches incoming messages
+func (c *Client) handleMessage(msg dap.Message) {
+	switch m := msg.(type) {
+	case *dap.Response:
+		c.dispatchResponse(m.RequestSeq, m)
+	case *dap.ErrorResponse:
+		c.dispatchResponse(m.RequestSeq, m)
+	case *dap.InitializeResponse:
+		c.dispatchResponse(m.RequestSeq, m)
+	case *dap.ConfigurationDoneResponse:
+		c.dispatchResponse(m.RequestSeq, m)
+	case *dap.LaunchResponse:
+		c.dispatchResponse(m.RequestSeq, m)
+	case *dap.SetBreakpointsResponse:
+		c.dispatchResponse(m.RequestSeq, m)
+	case *dap.ContinueResponse:
+		c.dispatchResponse(m.RequestSeq, m)
+	case *dap.NextResponse:
+		c.dispatchResponse(m.RequestSeq, m)
+	case *dap.StepInResponse:
+		c.dispatchResponse(m.RequestSeq, m)
+	case *dap.StepOutResponse:
+		c.dispatchResponse(m.RequestSeq, m)
+	case *dap.PauseResponse:
+		c.dispatchResponse(m.RequestSeq, m)
+	case *dap.ThreadsResponse:
+		c.dispatchResponse(m.RequestSeq, m)
+	case *dap.StackTraceResponse:
+		c.dispatchResponse(m.RequestSeq, m)
+	case *dap.ScopesResponse:
+		c.dispatchResponse(m.RequestSeq, m)
+	case *dap.VariablesResponse:
+		c.dispatchResponse(m.RequestSeq, m)
+	case *dap.EvaluateResponse:
+		c.dispatchResponse(m.RequestSeq, m)
+	case *dap.SetVariableResponse:
+		c.dispatchResponse(m.RequestSeq, m)
+	case *dap.DisconnectResponse:
+		c.dispatchResponse(m.RequestSeq, m)
+	default:
+		// It's an event or unknown message
+		// For now, just log it or handle via event listeners
+		if _, ok := msg.(dap.EventMessage); ok {
+			c.logEvent(msg)
+			c.broadcastEvent(msg)
+		} else {
+			log.Printf("Received unknown message type: %T", msg)
+		}
+	}
+}
+
+// SubscribeToEvents subscribes to all DAP events.
+// Returns a channel to receive events and a cleanup function.
+func (c *Client) SubscribeToEvents() (<-chan dap.Message, func()) {
+	ch := make(chan dap.Message, 100) // Buffer to prevent blocking
+	c.eventMu.Lock()
+	c.eventListeners = append(c.eventListeners, ch)
+	c.eventMu.Unlock()
+
+	cleanup := func() {
+		c.eventMu.Lock()
+		defer c.eventMu.Unlock()
+		for i, listener := range c.eventListeners {
+			if listener == ch {
+				// Remove (swap with last and shrink)
+				c.eventListeners[i] = c.eventListeners[len(c.eventListeners)-1]
+				c.eventListeners = c.eventListeners[:len(c.eventListeners)-1]
+				// close(ch) // Don't close, just stop sending. Caller might still be reading.
+				break
+			}
+		}
+	}
+	return ch, cleanup
+}
+
+// broadcastEvent sends an event to all listeners
+func (c *Client) broadcastEvent(event dap.Message) {
+	c.eventMu.Lock()
+	defer c.eventMu.Unlock()
+	for _, ch := range c.eventListeners {
+		select {
+		case ch <- event:
+		default:
+			log.Printf("Warning: Event listener buffer full, dropping event")
+		}
+	}
+}
+
+// dispatchResponse sends a response to the waiting request
+func (c *Client) dispatchResponse(seq int, msg dap.Message) {
+	c.reqMu.Lock()
+	ch, ok := c.pendingReqs[seq]
+	if ok {
+		delete(c.pendingReqs, seq)
+	}
+	c.reqMu.Unlock()
+
+	if ok {
+		ch <- msg
+	} else {
+		log.Printf("Received response for unknown/timed-out request seq %d: %T", seq, msg)
+	}
 }
 
 // Disconnect closes the connection to the DAP server
@@ -159,118 +292,45 @@ func (c *Client) write(msg dap.Message) error {
 	return dap.WriteProtocolMessage(c.conn, msg)
 }
 
-// waitForResponse waits for a response to a specific command
-func (c *Client) waitForResponse(ctx context.Context, expectedCommand string) (dap.Message, error) {
-	log.Printf("Waiting for response to command: %s", expectedCommand)
-	for {
-		msg, err := c.ReadWithTimeout(ctx)
-		if err != nil {
-			return nil, err
+// sendRequestAndWait sends a request and waits for the response
+func (c *Client) sendRequestAndWait(ctx context.Context, req dap.Message) (dap.Message, error) {
+	seq := req.GetSeq()
+	ch := make(chan dap.Message, 1)
+
+	c.reqMu.Lock()
+	c.pendingReqs[seq] = ch
+	c.reqMu.Unlock()
+
+	// Ensure cleanup
+	defer func() {
+		c.reqMu.Lock()
+		delete(c.pendingReqs, seq)
+		c.reqMu.Unlock()
+	}()
+
+	if err := c.write(req); err != nil {
+		return nil, err
+	}
+
+	select {
+	case resp := <-ch:
+		// Check for ErrorResponse
+		if errResp, ok := resp.(*dap.ErrorResponse); ok {
+			return nil, fmt.Errorf("DAP error: %s", errResp.Message)
 		}
-
-		switch m := msg.(type) {
-		case *dap.Response:
-			if m.Command == expectedCommand {
-				log.Printf("Received expected response for %s: Success=%v", m.Command, m.Success)
-				if !m.Success {
-					return nil, fmt.Errorf("command %s failed: %s", m.Command, m.Message)
-				}
-				return m, nil
-			}
-			log.Printf("Received response for different command: %s (waiting for %s)", m.Command, expectedCommand)
-
-		case *dap.ErrorResponse:
-			log.Printf("Received ErrorResponse for command %s: %s", m.Command, m.Message)
-			// If this is the error for our command, fail immediately
-			if m.Command == expectedCommand {
-				return nil, fmt.Errorf("command %s returned error: %s", expectedCommand, m.Message)
-			}
-
-		case *dap.Event:
-			log.Printf("Received Event while waiting: %s", m.Event)
-			c.logEvent(m)
-
-		// Specific response types
-		case *dap.InitializeResponse:
-			if expectedCommand == "initialize" {
-				return m, nil
-			}
-		case *dap.ConfigurationDoneResponse:
-			if expectedCommand == "configurationDone" {
-				return m, nil
-			}
-		case *dap.LaunchResponse:
-			if expectedCommand == "launch" {
-				return m, nil
-			}
-		case *dap.SetBreakpointsResponse:
-			if expectedCommand == "setBreakpoints" {
-				return m, nil
-			}
-		case *dap.ContinueResponse:
-			if expectedCommand == "continue" {
-				return m, nil
-			}
-		case *dap.NextResponse:
-			if expectedCommand == "next" {
-				return m, nil
-			}
-		case *dap.StepInResponse:
-			if expectedCommand == "stepIn" {
-				return m, nil
-			}
-		case *dap.StepOutResponse:
-			if expectedCommand == "stepOut" {
-				return m, nil
-			}
-		case *dap.PauseResponse:
-			if expectedCommand == "pause" {
-				return m, nil
-			}
-		case *dap.ThreadsResponse:
-			if expectedCommand == "threads" {
-				return m, nil
-			}
-		case *dap.StackTraceResponse:
-			if expectedCommand == "stackTrace" {
-				return m, nil
-			}
-		case *dap.ScopesResponse:
-			if expectedCommand == "scopes" {
-				return m, nil
-			}
-		case *dap.VariablesResponse:
-			if expectedCommand == "variables" {
-				return m, nil
-			}
-		case *dap.EvaluateResponse:
-			if expectedCommand == "evaluate" {
-				return m, nil
-			}
-		case *dap.SetVariableResponse:
-			if expectedCommand == "setVariable" {
-				return m, nil
-			}
-		case *dap.DisconnectResponse:
-			if expectedCommand == "disconnect" {
-				return m, nil
-			}
-
-		default:
-			// Handle specific event types that don't implement *dap.Event
-			if event, ok := msg.(dap.EventMessage); ok {
-				log.Printf("Received EventMessage while waiting: %s", event.GetEvent())
-				c.logEvent(msg)
-			} else {
-				log.Printf("Received unknown message type: %T", msg)
-			}
-		}
+		return resp, nil
+	case <-ctx.Done():
+		return nil, fmt.Errorf("request timed out: %w", ctx.Err())
 	}
 }
 
 // Initialize sends the initialize request to the DAP server
 // This must be the first request sent after connecting
 func (c *Client) Initialize(ctx context.Context) (*dap.InitializeResponse, error) {
+	// Subscribe to events BEFORE sending request to avoid missing "initialized" event
+	events, cleanup := c.SubscribeToEvents()
+	defer cleanup()
+
 	request := &dap.InitializeRequest{
 		Request: dap.Request{
 			ProtocolMessage: dap.ProtocolMessage{
@@ -296,40 +356,29 @@ func (c *Client) Initialize(ctx context.Context) (*dap.InitializeResponse, error
 		},
 	}
 
-	if err := c.write(request); err != nil {
+	resp, err := c.sendRequestAndWait(ctx, request)
+	if err != nil {
 		return nil, fmt.Errorf("failed to send initialize request: %w", err)
 	}
 
-	// Wait for initialize response using timeout wrapper
-	response, err := c.waitForResponse(ctx, "initialize")
-	if err != nil {
-		return nil, err
-	}
-
-	initResp, ok := response.(*dap.InitializeResponse)
+	initResp, ok := resp.(*dap.InitializeResponse)
 	if !ok {
-		return nil, fmt.Errorf("unexpected response type: %T", response)
+		return nil, fmt.Errorf("unexpected response type: %T", resp)
 	}
 
 	// Wait for initialized event
-	// The DAP spec says the debugger sends this when it is ready to accept configuration
 	log.Println("Waiting for initialized event...")
 	for {
-		msg, err := c.ReadWithTimeout(ctx)
-		if err != nil {
-			return nil, fmt.Errorf("failed to receive initialized event: %w", err)
+		select {
+		case <-ctx.Done():
+			return nil, fmt.Errorf("timeout waiting for initialized event: %w", ctx.Err())
+		case msg := <-events:
+			if _, ok := msg.(*dap.InitializedEvent); ok {
+				log.Println("Received initialized event")
+				return initResp, nil
+			}
 		}
-
-		if _, ok := msg.(*dap.InitializedEvent); ok {
-			log.Println("Received initialized event")
-			break
-		}
-
-		// Log other events while waiting
-		c.logEvent(msg)
 	}
-
-	return initResp, nil
 }
 
 // ConfigurationDone tells the DAP server that configuration is complete
@@ -345,13 +394,12 @@ func (c *Client) ConfigurationDone(ctx context.Context) error {
 		},
 	}
 
-	if err := c.write(request); err != nil {
+	_, err := c.sendRequestAndWait(ctx, request)
+	if err != nil {
 		return fmt.Errorf("failed to send configurationDone request: %w", err)
 	}
 
-	// Wait for configurationDone response
-	_, err := c.waitForResponse(ctx, "configurationDone")
-	return err
+	return nil
 }
 
 // SetBreakpoints sets breakpoints for a specific file
@@ -381,19 +429,14 @@ func (c *Client) SetBreakpoints(ctx context.Context, file string, lines []int) (
 		},
 	}
 
-	if err := c.write(request); err != nil {
-		return nil, fmt.Errorf("failed to send setBreakpoints request: %w", err)
-	}
-
-	// Wait for setBreakpoints response
-	response, err := c.waitForResponse(ctx, "setBreakpoints")
+	resp, err := c.sendRequestAndWait(ctx, request)
 	if err != nil {
 		return nil, err
 	}
 
-	bpResp, ok := response.(*dap.SetBreakpointsResponse)
+	bpResp, ok := resp.(*dap.SetBreakpointsResponse)
 	if !ok {
-		return nil, fmt.Errorf("unexpected response type: %T", response)
+		return nil, fmt.Errorf("unexpected response type: %T", resp)
 	}
 
 	return bpResp, nil
@@ -415,19 +458,14 @@ func (c *Client) Continue(ctx context.Context, threadId int) (*dap.ContinueRespo
 		},
 	}
 
-	if err := c.write(request); err != nil {
-		return nil, fmt.Errorf("failed to send continue request: %w", err)
-	}
-
-	// Wait for continue response
-	response, err := c.waitForResponse(ctx, "continue")
+	resp, err := c.sendRequestAndWait(ctx, request)
 	if err != nil {
 		return nil, err
 	}
 
-	contResp, ok := response.(*dap.ContinueResponse)
+	contResp, ok := resp.(*dap.ContinueResponse)
 	if !ok {
-		return nil, fmt.Errorf("unexpected response type: %T", response)
+		return nil, fmt.Errorf("unexpected response type: %T", resp)
 	}
 
 	return contResp, nil
@@ -449,19 +487,14 @@ func (c *Client) Next(ctx context.Context, threadId int) (*dap.NextResponse, err
 		},
 	}
 
-	if err := c.write(request); err != nil {
-		return nil, fmt.Errorf("failed to send next request: %w", err)
-	}
-
-	// Wait for next response
-	response, err := c.waitForResponse(ctx, "next")
+	resp, err := c.sendRequestAndWait(ctx, request)
 	if err != nil {
 		return nil, err
 	}
 
-	nextResp, ok := response.(*dap.NextResponse)
+	nextResp, ok := resp.(*dap.NextResponse)
 	if !ok {
-		return nil, fmt.Errorf("unexpected response type: %T", response)
+		return nil, fmt.Errorf("unexpected response type: %T", resp)
 	}
 
 	return nextResp, nil
@@ -483,19 +516,14 @@ func (c *Client) StepIn(ctx context.Context, threadId int) (*dap.StepInResponse,
 		},
 	}
 
-	if err := c.write(request); err != nil {
-		return nil, fmt.Errorf("failed to send stepIn request: %w", err)
-	}
-
-	// Wait for stepIn response
-	response, err := c.waitForResponse(ctx, "stepIn")
+	resp, err := c.sendRequestAndWait(ctx, request)
 	if err != nil {
 		return nil, err
 	}
 
-	stepInResp, ok := response.(*dap.StepInResponse)
+	stepInResp, ok := resp.(*dap.StepInResponse)
 	if !ok {
-		return nil, fmt.Errorf("unexpected response type: %T", response)
+		return nil, fmt.Errorf("unexpected response type: %T", resp)
 	}
 
 	return stepInResp, nil
@@ -518,19 +546,14 @@ func (c *Client) Pause(ctx context.Context, threadId int) (*dap.PauseResponse, e
 		},
 	}
 
-	if err := c.write(request); err != nil {
-		return nil, fmt.Errorf("failed to send pause request: %w", err)
-	}
-
-	// Wait for pause response
-	response, err := c.waitForResponse(ctx, "pause")
+	resp, err := c.sendRequestAndWait(ctx, request)
 	if err != nil {
 		return nil, err
 	}
 
-	pauseResp, ok := response.(*dap.PauseResponse)
+	pauseResp, ok := resp.(*dap.PauseResponse)
 	if !ok {
-		return nil, fmt.Errorf("unexpected response type: %T", response)
+		return nil, fmt.Errorf("unexpected response type: %T", resp)
 	}
 
 	return pauseResp, nil
@@ -549,19 +572,14 @@ func (c *Client) Threads(ctx context.Context) (*dap.ThreadsResponse, error) {
 		},
 	}
 
-	if err := c.write(request); err != nil {
-		return nil, fmt.Errorf("failed to send threads request: %w", err)
-	}
-
-	// Wait for threads response
-	response, err := c.waitForResponse(ctx, "threads")
+	resp, err := c.sendRequestAndWait(ctx, request)
 	if err != nil {
 		return nil, err
 	}
 
-	threadsResp, ok := response.(*dap.ThreadsResponse)
+	threadsResp, ok := resp.(*dap.ThreadsResponse)
 	if !ok {
-		return nil, fmt.Errorf("unexpected response type: %T", response)
+		return nil, fmt.Errorf("unexpected response type: %T", resp)
 	}
 
 	return threadsResp, nil
@@ -585,19 +603,14 @@ func (c *Client) StackTrace(ctx context.Context, threadId int, startFrame int, l
 		},
 	}
 
-	if err := c.write(request); err != nil {
-		return nil, fmt.Errorf("failed to send stackTrace request: %w", err)
-	}
-
-	// Wait for stackTrace response
-	response, err := c.waitForResponse(ctx, "stackTrace")
+	resp, err := c.sendRequestAndWait(ctx, request)
 	if err != nil {
 		return nil, err
 	}
 
-	stackResp, ok := response.(*dap.StackTraceResponse)
+	stackResp, ok := resp.(*dap.StackTraceResponse)
 	if !ok {
-		return nil, fmt.Errorf("unexpected response type: %T", response)
+		return nil, fmt.Errorf("unexpected response type: %T", resp)
 	}
 
 	return stackResp, nil
@@ -619,19 +632,14 @@ func (c *Client) Scopes(ctx context.Context, frameId int) (*dap.ScopesResponse, 
 		},
 	}
 
-	if err := c.write(request); err != nil {
-		return nil, fmt.Errorf("failed to send scopes request: %w", err)
-	}
-
-	// Wait for scopes response
-	response, err := c.waitForResponse(ctx, "scopes")
+	resp, err := c.sendRequestAndWait(ctx, request)
 	if err != nil {
 		return nil, err
 	}
 
-	scopesResp, ok := response.(*dap.ScopesResponse)
+	scopesResp, ok := resp.(*dap.ScopesResponse)
 	if !ok {
-		return nil, fmt.Errorf("unexpected response type: %T", response)
+		return nil, fmt.Errorf("unexpected response type: %T", resp)
 	}
 
 	return scopesResp, nil
@@ -653,19 +661,14 @@ func (c *Client) Variables(ctx context.Context, variablesReference int) (*dap.Va
 		},
 	}
 
-	if err := c.write(request); err != nil {
-		return nil, fmt.Errorf("failed to send variables request: %w", err)
-	}
-
-	// Wait for variables response
-	response, err := c.waitForResponse(ctx, "variables")
+	resp, err := c.sendRequestAndWait(ctx, request)
 	if err != nil {
 		return nil, err
 	}
 
-	varsResp, ok := response.(*dap.VariablesResponse)
+	varsResp, ok := resp.(*dap.VariablesResponse)
 	if !ok {
-		return nil, fmt.Errorf("unexpected response type: %T", response)
+		return nil, fmt.Errorf("unexpected response type: %T", resp)
 	}
 
 	return varsResp, nil
@@ -690,19 +693,14 @@ func (c *Client) Evaluate(ctx context.Context, expression string, frameId int, c
 		},
 	}
 
-	if err := c.write(request); err != nil {
-		return nil, fmt.Errorf("failed to send evaluate request: %w", err)
-	}
-
-	// Wait for evaluate response
-	response, err := c.waitForResponse(ctx, "evaluate")
+	resp, err := c.sendRequestAndWait(ctx, request)
 	if err != nil {
 		return nil, err
 	}
 
-	evalResp, ok := response.(*dap.EvaluateResponse)
+	evalResp, ok := resp.(*dap.EvaluateResponse)
 	if !ok {
-		return nil, fmt.Errorf("unexpected response type: %T", response)
+		return nil, fmt.Errorf("unexpected response type: %T", resp)
 	}
 
 	return evalResp, nil
@@ -736,19 +734,14 @@ func (c *Client) Launch(ctx context.Context, args map[string]interface{}) (*dap.
 		Arguments: argsJSON,
 	}
 
-	if err := c.write(request); err != nil {
-		return nil, fmt.Errorf("failed to send launch request: %w", err)
-	}
-
-	// Wait for launch response
-	response, err := c.waitForResponse(ctx, "launch")
+	resp, err := c.sendRequestAndWait(ctx, request)
 	if err != nil {
 		return nil, err
 	}
 
-	launchResp, ok := response.(*dap.LaunchResponse)
+	launchResp, ok := resp.(*dap.LaunchResponse)
 	if !ok {
-		return nil, fmt.Errorf("unexpected response type: %T", response)
+		return nil, fmt.Errorf("unexpected response type: %T", resp)
 	}
 
 	return launchResp, nil
@@ -757,7 +750,25 @@ func (c *Client) Launch(ctx context.Context, args map[string]interface{}) (*dap.
 // LaunchWithConfigurationDone sends a launch request followed immediately by configurationDone.
 // This is required for Godot, which only sends the launch response AFTER receiving configurationDone.
 func (c *Client) LaunchWithConfigurationDone(ctx context.Context, args map[string]interface{}) (*dap.LaunchResponse, error) {
-	// 1. Send Launch Request
+	// 1. Send Launch Request and Wait
+	// Godot 4.x sends LaunchResponse immediately before/during ConfigurationDone?
+	// Actually, standard DAP says LaunchResponse comes first.
+	// Godot might be interleaving.
+	// If Godot blocks sending LaunchResponse until it gets ConfigurationDone, we have a deadlock if we wait synchronously.
+	// But my simulation showed LaunchResponse came back.
+	// However, the comment "This is required for Godot, which only sends the launch response AFTER receiving configurationDone"
+	// contradicts my finding or implies a deadlock risk.
+	
+	// Let's assume Godot MIGHT block launch response.
+	// If so, we should send both requests asynchronously?
+	// But sendRequestAndWait blocks.
+	
+	// If Godot waits for configDone to send launch response, we CANNOT wait for launch response before sending configDone.
+	// We must send Launch, then Send ConfigDone, then wait for both.
+	
+	// To do this with sendRequestAndWait, we'd need goroutines.
+	
+	// Marshal arguments to JSON
 	argsJSON, err := json.Marshal(args)
 	if err != nil {
 		return nil, fmt.Errorf("failed to marshal launch arguments: %w", err)
@@ -773,14 +784,7 @@ func (c *Client) LaunchWithConfigurationDone(ctx context.Context, args map[strin
 		},
 		Arguments: argsJSON,
 	}
-
-	log.Println("DEBUG: Sending Launch Request...")
-	if err := c.write(launchRequest); err != nil {
-		return nil, fmt.Errorf("failed to send launch request: %w", err)
-	}
-	log.Println("DEBUG: Launch Request sent.")
-
-	// 2. Send ConfigurationDone Request
+	
 	configDoneRequest := &dap.ConfigurationDoneRequest{
 		Request: dap.Request{
 			ProtocolMessage: dap.ProtocolMessage{
@@ -791,39 +795,72 @@ func (c *Client) LaunchWithConfigurationDone(ctx context.Context, args map[strin
 		},
 	}
 
+	// Use channels to wait
+	launchSeq := launchRequest.Seq
+	configSeq := configDoneRequest.Seq
+	
+	launchCh := make(chan dap.Message, 1)
+	configCh := make(chan dap.Message, 1)
+	
+	c.reqMu.Lock()
+	c.pendingReqs[launchSeq] = launchCh
+	c.pendingReqs[configSeq] = configCh
+	c.reqMu.Unlock()
+	
+	defer func() {
+		c.reqMu.Lock()
+		delete(c.pendingReqs, launchSeq)
+		delete(c.pendingReqs, configSeq)
+		c.reqMu.Unlock()
+	}()
+	
+	log.Println("DEBUG: Sending Launch Request...")
+	if err := c.write(launchRequest); err != nil {
+		return nil, fmt.Errorf("failed to send launch request: %w", err)
+	}
+	
 	log.Println("DEBUG: Sending ConfigurationDone Request...")
 	if err := c.write(configDoneRequest); err != nil {
 		return nil, fmt.Errorf("failed to send configurationDone request: %w", err)
 	}
-	log.Println("DEBUG: ConfigurationDone Request sent.")
-
-	// 3. Wait for BOTH responses (in any order)
+	
+	// Wait for both
 	var launchResp *dap.LaunchResponse
-	var configDoneResp *dap.ConfigurationDoneResponse
-
-	// Loop until we have both responses
-	for launchResp == nil || configDoneResp == nil {
-		msg, err := c.ReadWithTimeout(ctx)
-		if err != nil {
-			return nil, err
-		}
-
-		switch m := msg.(type) {
-		case *dap.LaunchResponse:
-			if !m.Success {
-				return nil, fmt.Errorf("launch failed: %s", m.Message)
+	
+	// We need to collect both. Order doesn't matter.
+	timeout := time.After(30 * time.Second) // Default timeout
+	if d, ok := ctx.Deadline(); ok {
+		timeout = time.After(time.Until(d))
+	}
+	
+	gotLaunch := false
+	gotConfig := false
+	
+	for !gotLaunch || !gotConfig {
+		select {
+		case msg := <-launchCh:
+			gotLaunch = true
+			if m, ok := msg.(*dap.LaunchResponse); ok {
+				if !m.Success {
+					return nil, fmt.Errorf("launch failed: %s", m.Message)
+				}
+				launchResp = m
+			} else if m, ok := msg.(*dap.ErrorResponse); ok {
+				return nil, fmt.Errorf("launch error: %s", m.Message)
 			}
-			launchResp = m
-		case *dap.ConfigurationDoneResponse:
-			if !m.Success {
-				return nil, fmt.Errorf("configurationDone failed: %s", m.Message)
+		case msg := <-configCh:
+			gotConfig = true
+			if m, ok := msg.(*dap.ConfigurationDoneResponse); ok {
+				if !m.Success {
+					return nil, fmt.Errorf("configurationDone failed: %s", m.Message)
+				}
+			} else if m, ok := msg.(*dap.ErrorResponse); ok {
+				return nil, fmt.Errorf("configurationDone error: %s", m.Message)
 			}
-			configDoneResp = m
-		case *dap.ErrorResponse:
-			return nil, fmt.Errorf("command failed: %s", m.Message)
-		default:
-			// Log other messages (events, etc.) and continue
-			c.logEvent(m)
+		case <-ctx.Done():
+			return nil, ctx.Err()
+		case <-timeout:
+			return nil, fmt.Errorf("timeout waiting for launch/configDone responses")
 		}
 	}
 

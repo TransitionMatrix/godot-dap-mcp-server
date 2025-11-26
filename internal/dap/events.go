@@ -1,6 +1,8 @@
 package dap
 
 import (
+	"context"
+	"fmt"
 	"log"
 
 	"github.com/google/go-dap"
@@ -20,6 +22,25 @@ func (c *Client) initEventHandling() {
 	// This will be called during client creation
 }
 
+// WaitForStop waits for a stopped event
+func (c *Client) WaitForStop(ctx context.Context) (*dap.StoppedEventBody, error) {
+	log.Printf("Waiting for stopped event...")
+	
+	events, cleanup := c.SubscribeToEvents()
+	defer cleanup()
+	
+	for {
+		select {
+		case <-ctx.Done():
+			return nil, fmt.Errorf("wait for stop timeout: %w", ctx.Err())
+		case msg := <-events:
+			if stopped, ok := msg.(*dap.StoppedEvent); ok {
+				log.Printf("Received StoppedEvent: %s", stopped.Body.Reason)
+				return &stopped.Body, nil
+			}
+		}
+	}
+}
 
 // logEvent logs a DAP event
 func (c *Client) logEvent(event interface{}) {

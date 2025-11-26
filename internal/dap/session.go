@@ -2,10 +2,9 @@ package dap
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 
-	"github.com/google/go-dap"
+	dap "github.com/google/go-dap"
 )
 
 // SessionState represents the current state of the DAP session
@@ -38,8 +37,9 @@ func (s SessionState) String() string {
 
 // Session manages the lifecycle of a DAP debugging session
 type Session struct {
-	client *Client
-	state  SessionState
+	client      *Client
+	state       SessionState
+	projectRoot string
 }
 
 // NewSession creates a new DAP session
@@ -58,6 +58,16 @@ func (s *Session) GetClient() *Client {
 // GetState returns the current session state
 func (s *Session) GetState() SessionState {
 	return s.state
+}
+
+// SetProjectRoot sets the project root directory for path resolution
+func (s *Session) SetProjectRoot(path string) {
+	s.projectRoot = path
+}
+
+// GetProjectRoot returns the project root directory
+func (s *Session) GetProjectRoot() string {
+	return s.projectRoot
 }
 
 // InitializeSession performs the full initialization sequence:
@@ -178,35 +188,9 @@ func (s *Session) Launch(ctx context.Context, args map[string]interface{}) (*dap
 	ctx, cancel := WithCommandTimeout(ctx)
 	defer cancel()
 
-	// Marshal args to JSON as required by LaunchRequest.Arguments
-	argsJSON, err := json.Marshal(args)
-	if err != nil {
-		return nil, fmt.Errorf("failed to marshal launch arguments: %w", err)
-	}
-
-	request := &dap.LaunchRequest{
-		Request: dap.Request{
-			ProtocolMessage: dap.ProtocolMessage{
-				Seq:  s.client.nextRequestSeq(),
-				Type: "request",
-			},
-			Command: "launch",
-		},
-		Arguments: argsJSON,
-	}
-
-	if err := s.client.write(request); err != nil {
-		return nil, fmt.Errorf("failed to send launch request: %w", err)
-	}
-
-	response, err := s.client.waitForResponse(ctx, "launch")
+	launchResp, err := s.client.Launch(ctx, args)
 	if err != nil {
 		return nil, err
-	}
-
-	launchResp, ok := response.(*dap.LaunchResponse)
-	if !ok {
-		return nil, fmt.Errorf("unexpected response type: %T", response)
 	}
 
 	// Note: Don't call SetLaunched() here! The launch request is just stored.
