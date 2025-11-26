@@ -9,14 +9,22 @@ import (
 )
 
 func main() {
-	// Configure logging to file
-	logFile, err := os.OpenFile("godot-dap-debug.log", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
-	if err != nil {
-		log.Printf("Failed to open log file: %v", err)
-	} else {
-		defer logFile.Close()
-		log.SetOutput(logFile)
+	// Configure logging
+	// By default, log to stderr (MCP clients usually capture this)
+	// Can be overridden by GODOT_MCP_LOG_FILE environment variable
+	logOutput := os.Stderr
+	
+	if logPath := os.Getenv("GODOT_MCP_LOG_FILE"); logPath != "" {
+		f, err := os.OpenFile(logPath, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+		if err != nil {
+			log.Printf("Failed to open log file %s: %v", logPath, err)
+		} else {
+			defer f.Close()
+			logOutput = f
+		}
 	}
+	
+	log.SetOutput(logOutput)
 	log.SetFlags(log.Ldate | log.Ltime | log.Lshortfile)
 
 	log.Println("==========================================")
