@@ -66,7 +66,15 @@ godot_continue(thread_id=1)`,
 			client := session.GetClient()
 			resp, err := client.Continue(ctx, threadId)
 			if err != nil {
-				return nil, fmt.Errorf("failed to continue execution: %w", err)
+				return nil, FormatError(
+					"Failed to continue execution",
+					"",
+					[]string{
+						"Game might not be paused",
+						"Connection might be lost (check with godot_get_threads)",
+					},
+					err,
+				)
 			}
 
 			return map[string]interface{}{
@@ -133,7 +141,15 @@ godot_step_over(thread_id=1)`,
 			client := session.GetClient()
 			_, err = client.Next(ctx, threadId)
 			if err != nil {
-				return nil, fmt.Errorf("failed to step over: %w", err)
+				return nil, FormatError(
+					"Failed to step over",
+					"",
+					[]string{
+						"Game might not be paused",
+						"Thread ID might be invalid",
+					},
+					err,
+				)
 			}
 
 			return map[string]interface{}{
@@ -201,7 +217,16 @@ godot_step_into(thread_id=1)`,
 			client := session.GetClient()
 			_, err = client.StepIn(ctx, threadId)
 			if err != nil {
-				return nil, fmt.Errorf("failed to step into: %w", err)
+				return nil, FormatError(
+					"Failed to step into",
+					"",
+					[]string{
+						"Game might not be paused",
+						"Current line might not be a function call",
+						"Target function might be native (cannot step into C++)",
+					},
+					err,
+				)
 			}
 
 			return map[string]interface{}{

@@ -150,68 +150,13 @@ Returns: Variable name, new value, and type`,
 
 		Handler: func(params map[string]interface{}) (interface{}, error) {
 			// Get active session
-			session, err := GetSession()
+			_, err := GetSession()
 			if err != nil {
 				return nil, fmt.Errorf("%w\n\nPlease call godot_connect first to establish a DAP session", err)
 			}
 
-			// Get variable name parameter
-			varName, ok := params["variable_name"].(string)
-			if !ok || varName == "" {
-				return nil, fmt.Errorf("variable_name is required and must be a non-empty string")
-			}
-
-			// Validate variable name (security: prevent code injection)
-			if !isValidVariableName(varName) {
-				return nil, fmt.Errorf(`Invalid variable name: %s
-
-Variable names must:
-- Start with a letter or underscore
-- Contain only letters, numbers, and underscores
-- Not contain spaces, operators, or special characters
-
-Examples:
-✅ Valid:   player_health, _internal_var, score123
-❌ Invalid: player health, health+10, get_node("Player")
-
-For complex expressions, use godot_evaluate instead.`, varName)
-			}
-
-			// Get value parameter
-			value, ok := params["value"]
-			if !ok {
-				return nil, fmt.Errorf("value parameter is required")
-			}
-
-			// Get frame ID parameter
-			frameId := 0
-			if fid, ok := params["frame_id"].(float64); ok {
-				frameId = int(fid)
-			}
-
-			// Format value for GDScript
-			formattedValue := formatValueForGDScript(value)
-
-			// Build assignment expression
-			expression := fmt.Sprintf("%s = %s", varName, formattedValue)
-
-			// Use evaluate() to set the variable (workaround for missing setVariable)
-			ctx, cancel := dap.WithCommandTimeout(context.Background())
-			defer cancel()
-
-			client := session.GetClient()
-			resp, err := client.Evaluate(ctx, expression, frameId, "repl")
-			if err != nil {
-				return nil, fmt.Errorf("failed to set variable: %w\n\nPossible causes:\n1. Variable '%s' does not exist in current scope\n2. Value type is incompatible with variable type\n3. Frame ID %d is invalid\n\nSolutions:\n1. Use godot_get_variables to verify variable exists\n2. Check variable type matches value type\n3. Use godot_get_stack_trace to get valid frame IDs", err, varName, frameId)
-			}
-
-			return map[string]interface{}{
-				"status":   "success",
-				"variable": varName,
-				"value":    resp.Body.Result,
-				"type":     resp.Body.Type,
-				"message":  fmt.Sprintf("Successfully set %s = %s", varName, resp.Body.Result),
-			}, nil
+			// Return explanatory error
+			return nil, fmt.Errorf("godot_set_variable is currently unavailable.\n\nAnalysis of Godot 4.x source code confirms that while Godot advertises 'supportsSetVariable', the implementation is missing from the engine's DAP server.\n\nWorkarounds using expression evaluation also fail because GDScript assignments are statements, not expressions.\n\nFuture Work: We plan to submit a Pull Request to the Godot Engine to implement this feature. Until then, variables can only be inspected, not modified.")
 		},
 	})
 }

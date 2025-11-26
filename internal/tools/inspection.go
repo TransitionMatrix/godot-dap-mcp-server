@@ -48,7 +48,15 @@ godot_get_threads()`,
 			client := session.GetClient()
 			resp, err := client.Threads(ctx)
 			if err != nil {
-				return nil, fmt.Errorf("failed to get threads: %w", err)
+				return nil, FormatError(
+					"Failed to get threads",
+					"",
+					[]string{
+						"Connection might be lost",
+						"Game might have crashed",
+					},
+					err,
+				)
 			}
 
 			// Format response
@@ -136,7 +144,15 @@ godot_get_stack_trace(thread_id=1, max_frames=5)`,
 			client := session.GetClient()
 			resp, err := client.StackTrace(ctx, threadId, 0, maxFrames)
 			if err != nil {
-				return nil, fmt.Errorf("failed to get stack trace: %w", err)
+				return nil, FormatError(
+					"Failed to get stack trace",
+					"",
+					[]string{
+						"Game might not be paused (cannot get stack trace while running)",
+						"Thread ID might be invalid",
+					},
+					err,
+				)
 			}
 
 			// Format stack frames
@@ -225,7 +241,15 @@ godot_get_scopes(frame_id=1)`,
 			client := session.GetClient()
 			resp, err := client.Scopes(ctx, frameId)
 			if err != nil {
-				return nil, fmt.Errorf("failed to get scopes: %w", err)
+				return nil, FormatError(
+					"Failed to get scopes",
+					fmt.Sprintf("frame_id=%d", frameId),
+					[]string{
+						"Frame ID might be invalid (get fresh IDs from godot_get_stack_trace)",
+						"Game might not be paused",
+					},
+					err,
+				)
 			}
 
 			// Format scopes
@@ -335,7 +359,15 @@ Example: Scene tree navigation workflow
 			client := session.GetClient()
 			resp, err := client.Variables(ctx, varRef)
 			if err != nil {
-				return nil, fmt.Errorf("failed to get variables: %w", err)
+				return nil, FormatError(
+					"Failed to get variables",
+					fmt.Sprintf("ref=%d", varRef),
+					[]string{
+						"Variables reference might be stale (get fresh scopes)",
+						"Game might not be paused",
+					},
+					err,
+				)
 			}
 
 				// Format variables with Godot-specific formatting
@@ -436,7 +468,16 @@ godot_evaluate(expression="$Player/Sprite.texture.get_size()", frame_id=1)`,
 			client := session.GetClient()
 			resp, err := client.Evaluate(ctx, expression, frameId, evalContext)
 			if err != nil {
-				return nil, fmt.Errorf("failed to evaluate expression: %w", err)
+				return nil, FormatError(
+					"Failed to evaluate expression",
+					fmt.Sprintf("expr='%s'", expression),
+					[]string{
+						"Expression syntax might be invalid",
+						"Variables might not be available in current scope",
+						"Game might not be paused",
+					},
+					err,
+				)
 			}
 
 			// Format response with Godot-specific formatting

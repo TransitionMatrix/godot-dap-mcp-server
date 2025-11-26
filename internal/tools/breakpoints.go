@@ -3,7 +3,6 @@ package tools
 import (
 	"context"
 	"fmt"
-	"path/filepath"
 
 	"github.com/TransitionMatrix/godot-dap-mcp-server/internal/dap"
 	"github.com/TransitionMatrix/godot-dap-mcp-server/internal/mcp"
@@ -21,7 +20,7 @@ The breakpoint will be active for all subsequent runs until cleared.
 
 Prerequisites:
 - Must be connected to Godot DAP server (call godot_connect first)
-- File path must be absolute or relative to project root
+- File path must be absolute OR start with "res://" (if project path was set in godot_connect)
 - Line number must be valid (positive integer)
 
 Use this tool:
@@ -35,7 +34,7 @@ location will be returned.
 
 File path requirements:
 - Can be absolute path: /path/to/project/scripts/player.gd
-- Can be res:// path: res://scripts/player.gd
+- Can be res:// path: res://scripts/player.gd (Requires 'project' arg in godot_connect)
 - Must point to a .gd (GDScript) file
 
 Example: Set breakpoint in player script
@@ -79,20 +78,10 @@ godot_set_breakpoint(file="/Users/dev/myproject/player.gd", line=12)`,
 			}
 			line := int(lineFloat)
 
-			// Normalize file path
-			// Godot expects absolute paths or res:// paths
-			normalizedFile := file
-			if !filepath.IsAbs(file) && !isResPath(file) {
-				// If it's a relative path, warn the user
-				return nil, fmt.Errorf(`File path must be absolute or use res:// prefix
-
-Provided path: %s
-
-Valid examples:
-- res://scripts/player.gd
-- /Users/dev/myproject/scripts/player.gd
-
-Godot requires absolute file paths or res:// protocol paths for breakpoints.`, file)
+			// Resolve file path
+			normalizedFile, err := resolveGodotPath(file, session.GetProjectRoot())
+			if err != nil {
+				return nil, err
 			}
 
 			// Send setBreakpoints request
@@ -191,16 +180,10 @@ godot_clear_breakpoint(file="/Users/dev/myproject/player.gd")`,
 				return nil, fmt.Errorf("file parameter is required and must be a non-empty string")
 			}
 
-			// Normalize file path
-			normalizedFile := file
-			if !filepath.IsAbs(file) && !isResPath(file) {
-				return nil, fmt.Errorf(`File path must be absolute or use res:// prefix
-
-Provided path: %s
-
-Valid examples:
-- res://scripts/player.gd
-- /Users/dev/myproject/scripts/player.gd`, file)
+			// Resolve file path
+			normalizedFile, err := resolveGodotPath(file, session.GetProjectRoot())
+			if err != nil {
+				return nil, err
 			}
 
 			// Send setBreakpoints with empty list to clear all breakpoints
@@ -220,9 +203,4 @@ Valid examples:
 			}, nil
 		},
 	})
-}
-
-// isResPath checks if a path uses the Godot res:// protocol
-func isResPath(path string) bool {
-	return len(path) >= 6 && path[:6] == "res://"
 }

@@ -24,7 +24,7 @@ func TestGetSession_NoSession(t *testing.T) {
 		t.Error("GetSession should error when no session exists")
 	}
 
-	expectedMsg := "not connected to Godot DAP server"
+	expectedMsg := "Not connected to Godot DAP server"
 	if !strings.Contains(err.Error(), expectedMsg) {
 		t.Errorf("Expected error to contain '%s', got: %v", expectedMsg, err)
 	}

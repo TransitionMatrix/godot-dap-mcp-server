@@ -115,7 +115,16 @@ godot_launch_main_scene(project="/path/to/project", profiling=true)`,
 			defer cancel()
 
 			if _, err := session.LaunchGodotScene(ctx, config); err != nil {
-				return nil, fmt.Errorf("failed to launch main scene: %w", err)
+				return nil, FormatError(
+					"Failed to launch main scene",
+					fmt.Sprintf("project=%s", projectPath),
+					[]string{
+						"Godot editor might be busy or not responding",
+						"Project path might be incorrect",
+						"DAP connection might be unstable",
+					},
+					err,
+				)
 			}
 
 			return map[string]interface{}{
@@ -248,7 +257,16 @@ godot_launch_scene(project="/path/to/project", scene="res://test.tscn", debug_co
 			defer cancel()
 
 			if _, err := session.LaunchGodotScene(ctx, config); err != nil {
-				return nil, fmt.Errorf("failed to launch scene %s: %w", scenePath, err)
+				return nil, FormatError(
+					fmt.Sprintf("Failed to launch scene %s", scenePath),
+					fmt.Sprintf("project=%s", projectPath),
+					[]string{
+						"Scene file might not exist",
+						"Scene path format might be incorrect (use res://...)",
+						"Godot editor might be busy",
+					},
+					err,
+				)
 			}
 
 			return map[string]interface{}{
@@ -364,7 +382,15 @@ godot_launch_current_scene(project="/path/to/project", profiling=true, debug_col
 			defer cancel()
 
 			if _, err := session.LaunchGodotScene(ctx, config); err != nil {
-				return nil, fmt.Errorf("failed to launch current scene: %w", err)
+				return nil, FormatError(
+					"Failed to launch current scene",
+					fmt.Sprintf("project=%s", projectPath),
+					[]string{
+						"No scene might be open in the editor",
+						"Godot editor might be busy",
+					},
+					err,
+				)
 			}
 
 			return map[string]interface{}{

@@ -14,49 +14,59 @@ func TestBreakpointTools_Registration(t *testing.T) {
 	// The tools should be registered successfully
 }
 
-func TestIsResPath(t *testing.T) {
+func TestResolveGodotPath(t *testing.T) {
+	projectRoot := "/Users/dev/project"
+	
 	tests := []struct {
-		name     string
-		path     string
-		expected bool
+		name        string
+		path        string
+		projectRoot string
+		wantPath    string
+		wantErr     bool
 	}{
 		{
-			name:     "valid res path",
-			path:     "res://scripts/player.gd",
-			expected: true,
+			name:        "valid res path with root",
+			path:        "res://scripts/player.gd",
+			projectRoot: projectRoot,
+			wantPath:    "/Users/dev/project/scripts/player.gd",
+			wantErr:     false,
 		},
 		{
-			name:     "absolute path",
-			path:     "/Users/dev/project/player.gd",
-			expected: false,
+			name:        "valid res path without root",
+			path:        "res://scripts/player.gd",
+			projectRoot: "",
+			wantErr:     true,
 		},
 		{
-			name:     "relative path",
-			path:     "scripts/player.gd",
-			expected: false,
+			name:        "absolute path",
+			path:        "/Users/dev/project/player.gd",
+			projectRoot: projectRoot,
+			wantPath:    "/Users/dev/project/player.gd",
+			wantErr:     false,
 		},
 		{
-			name:     "empty path",
-			path:     "",
-			expected: false,
+			name:        "relative path",
+			path:        "scripts/player.gd",
+			projectRoot: projectRoot,
+			wantErr:     true,
 		},
 		{
-			name:     "res prefix only",
-			path:     "res:",
-			expected: false,
-		},
-		{
-			name:     "res:/ single slash",
-			path:     "res:/player.gd",
-			expected: false,
+			name:        "empty path",
+			path:        "",
+			projectRoot: projectRoot,
+			wantErr:     true,
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result := isResPath(tt.path)
-			if result != tt.expected {
-				t.Errorf("isResPath(%q) = %v, want %v", tt.path, result, tt.expected)
+			got, err := resolveGodotPath(tt.path, tt.projectRoot)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("resolveGodotPath() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+			if !tt.wantErr && got != tt.wantPath {
+				t.Errorf("resolveGodotPath() = %v, want %v", got, tt.wantPath)
 			}
 		})
 	}
@@ -73,53 +83,3 @@ func TestBreakpointTools_RequireSession(t *testing.T) {
 	}
 }
 
-func TestSetBreakpoint_PathValidation(t *testing.T) {
-	// Test path validation logic
-	// Valid paths: absolute or res://
-	// Invalid paths: relative (without res://)
-
-	tests := []struct {
-		name      string
-		path      string
-		shouldErr bool
-	}{
-		{
-			name:      "absolute path",
-			path:      "/Users/dev/project/player.gd",
-			shouldErr: false,
-		},
-		{
-			name:      "res:// path",
-			path:      "res://scripts/player.gd",
-			shouldErr: false,
-		},
-		{
-			name:      "relative path",
-			path:      "scripts/player.gd",
-			shouldErr: true,
-		},
-		{
-			name:      "empty path",
-			path:      "",
-			shouldErr: true,
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			// Test isResPath helper and path validation logic
-			isRes := isResPath(tt.path)
-			isAbs := len(tt.path) > 0 && tt.path[0] == '/'
-
-			isValid := isRes || isAbs
-			if (tt.path == "") {
-				isValid = false
-			}
-
-			shouldBeValid := !tt.shouldErr
-			if isValid != shouldBeValid {
-				t.Errorf("Path validation for %q: got valid=%v, want valid=%v", tt.path, isValid, shouldBeValid)
-			}
-		})
-	}
-}

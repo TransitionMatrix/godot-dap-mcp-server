@@ -16,7 +16,7 @@ var globalSession *dap.Session
 // Returns error if no session is active
 func GetSession() (*dap.Session, error) {
 	if globalSession == nil {
-		return nil, fmt.Errorf("not connected to Godot DAP server")
+		return nil, ErrNotConnected()
 	}
 	return globalSession, nil
 }
@@ -47,8 +47,8 @@ Use this tool:
 Example: Connect to default port
 godot_connect()
 
-Example: Connect to custom port
-godot_connect(port=6007)`,
+Example: Connect with project path (enables res:// path resolution)
+godot_connect(project="/path/to/my/project")`,
 
 		Parameters: []mcp.Parameter{
 			{
@@ -57,6 +57,12 @@ godot_connect(port=6007)`,
 				Required:    false,
 				Default:     6006,
 				Description: "DAP server port number (default: 6006)",
+			},
+			{
+				Name:        "project",
+				Type:        "string",
+				Required:    false,
+				Description: "Absolute path to project root (optional, enables res:// path resolution)",
 			},
 		},
 
@@ -78,24 +84,26 @@ godot_connect(port=6007)`,
 			// Create new session
 			session := dap.NewSession("localhost", port)
 
+			// Set project root if provided
+			if proj, ok := params["project"].(string); ok && proj != "" {
+				session.SetProjectRoot(proj)
+			}
+
 			// Connect with timeout
 			ctx, cancel := dap.WithConnectTimeout(context.Background())
 			defer cancel()
 
 			if err := session.Connect(ctx); err != nil {
-				return nil, fmt.Errorf(`Failed to connect to Godot DAP server at localhost:%d
-
-Possible causes:
-1. Godot editor is not running
-2. DAP server is not enabled in editor settings
-3. DAP server is using a different port
-
-Solutions:
-1. Launch Godot editor
-2. Enable DAP in Editor → Editor Settings → Network → Debug Adapter
-3. Check port setting (default: 6006)
-
-Error: %w`, port, err)
+				return nil, FormatError(
+					"Failed to connect to Godot DAP server",
+					fmt.Sprintf("localhost:%d", port),
+					[]string{
+						"Launch Godot editor",
+						"Enable DAP in Editor → Editor Settings → Network → Debug Adapter",
+						fmt.Sprintf("Check port setting (default: 6006, tried: %d)", port),
+					},
+					err,
+				)
 			}
 
 			// Initialize the session
