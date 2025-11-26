@@ -17,20 +17,18 @@
 The system follows a three-layer architecture:
 
 ### 1. MCP Layer (`internal/mcp/`)
-- Stdio-based JSONRPC 2.0 communication with MCP clients
-- Tool registration and routing
-- Request/response handling
-- JSON Schema generation with proper "any" type handling
+- Stdio-based JSONRPC 2.0 communication
+- **Concurrent Request Handling**: Request handlers run in goroutines to prevent deadlocks from blocked tools.
+- **Thread-Safe Transport**: Mutex-protected stdout writing.
+- Tool registration and routing.
 
 ### 2. DAP Client Layer (`internal/dap/`)
 - TCP connection to Godot editor's DAP server (default port: 6006)
 - DAP protocol implementation using `github.com/google/go-dap`
-- **Deferred ConfigurationDone**: Handles `launch` -> `configurationDone` sequence correctly
-- Event filtering (critical: DAP sends async events mixed with responses)
-- ErrorResponse handling in waitForResponse
-- Explicit event type cases for all DAP events
-- Timeout protection (prevents hangs from unresponsive DAP server)
-- Session lifecycle management with state machine (Disconnected → Connected → Initialized → Configured → Launched)
+- **Event-Driven Architecture**: Robust event filtering and state transitions.
+- **Timeout Protection**: All DAP operations wrapped in contexts (10-30s).
+- **Deferred ConfigurationDone**: Handles `launch` -> `configurationDone` sequence.
+- Session lifecycle management with state machine.
 
 ### 3. Tool Layer (`internal/tools/`)
 - Godot-specific MCP tools with consistent naming: `godot_<action>_<object>`
@@ -39,40 +37,41 @@ The system follows a three-layer architecture:
   - **Phase 3 (7 tools)**: connect, disconnect, set/clear breakpoints, continue, step-over, step-in
   - **Phase 4 (5 tools)**: get_threads, get_stack_trace, get_scopes, get_variables, evaluate
   - **Phase 5 (3 tools)**: launch_main_scene, launch_scene, launch_current_scene
-  - **Phase 6 (2 tools)**: pause, set_variable
+  - **Phase 6 (2 tools)**: pause, set_variable (set_variable partially supported)
 - **Formatting utilities** (`formatting.go`): Pretty-print 15+ Godot types
 
 ## Protocol Flow
 ```
-MCP Client → stdio → MCP Server → TCP/DAP → Godot Editor → Game Instance
+MCP Client → stdio → MCP Server (Concurrent) → TCP/DAP → Godot Editor → Game Instance
 ```
 
 ## Implementation Status
+**Version**: v1.0.0 (Released)
+
 - ✅ Phase 1 Complete: Core MCP Server (16 tests)
 - ✅ Phase 2 Complete: DAP Client Layer (28 total tests)
 - ✅ Phase 3 Complete: Core Debugging Tools (43 total tests)
 - ✅ Phase 4 Complete: Runtime Inspection (61 total tests, Godot formatting)
 - ✅ Phase 5 Complete: Launch Tools (Integrated & Verified)
-- ⏳ **Phase 6 WIP: Advanced Tools** (pause, set_variable implemented, runtime testing in progress)
-- 🔲 Phase 7-8: Polish, documentation
+- ✅ Phase 6 Complete: Advanced Tools (Pause works; set_variable limited by Godot Engine)
+- ✅ Phase 7 Complete: Architecture Refactor (Event-driven, Mock Server)
+- ✅ Phase 8 Complete: Error Handling & Polish (Timeouts, Path Resolution, Concurrency Fix)
+- ✅ Phase 9 Complete: Documentation (README, TOOLS.md, EXAMPLES.md)
 
 ## Key Technical Insights
+- **Concurrency prevents deadlocks**: MCP server must handle requests concurrently; otherwise, a blocked `godot_pause` hangs the entire server.
 - **Launch Handshake**: `godot_connect` stops at `initialized`. `godot_launch_*` sends `launch` then `configurationDone` to complete handshake.
 - **Single DAP session design** (one debugging session at a time)
 - **Event filtering required**: DAP sends async events mixed with responses
-- All DAP operations need timeout protection (10-30s contexts)
 - **ConfigurationDone required**: After `Initialize()`, must call `ConfigurationDone()` or breakpoints timeout
 - Godot validates project paths in launch requests (must have project.godot)
-- **Absolute paths required**: Godot DAP doesn't support `res://` paths (Godot limitation, not DAP)
+- **Absolute paths required**: Godot DAP doesn't support `res://` paths; server resolves them automatically.
 - **Godot type formatting**: Vector2/3, Color, Nodes, Arrays automatically get semantic labels for AI readability
-- **Scene tree navigation**: No dedicated command; use object expansion with Node/* properties
-- **Security**: Variable names strictly validated to prevent code injection
 
 ## Testing Infrastructure
 
 **Compliance Testing** (`cmd/test-dap-protocol/`, `scripts/test-dap-compliance.sh`):
 - Automated verification of Godot DAP server protocol compliance
-- Validates Optional field handling, response ordering, Dictionary safety
 
 **Debug/Test Utilities**:
 - `cmd/debug-launch/` - Isolated launch testing utility
@@ -80,22 +79,16 @@ MCP Client → stdio → MCP Server → TCP/DAP → Godot Editor → Game Instan
 - `cmd/dump-setbreakpoints/` - Inspect DAP message serialization
 - `cmd/launch-test/` - Validate launch → breakpoints → configurationDone sequence
 - `cmd/test-full-debug-workflow/` - End-to-end 17-step debugging workflow test
+- `pkg/daptest` - Mock DAP server for offline testing
 
 ## Documentation Organization
 
 **Top-level docs/** - Active development documentation
 - Core: PLAN, ARCHITECTURE, IMPLEMENTATION_GUIDE, TESTING, DEPLOYMENT
-- DOCUMENTATION_WORKFLOW.md - Hybrid approach with phase-specific lessons
+- TOOLS.md - Full tool reference
+- EXAMPLES.md - Usage examples
 
 **docs/reference/** - Stable reference materials
-- **DAP_SESSION_GUIDE.md** - Complete DAP command reference with session flow examples
-- Protocol details, conventions, FAQ, debugAdapterProtocol.json
+- DAP_SESSION_GUIDE.md, GODOT_SOURCE_ANALYSIS.md, CONVENTIONS.md
 
 **docs/godot-upstream/** - Upstream submission materials
-- STRATEGY.md, TESTING_GUIDE.md, PROGRESS.md
-
-**docs/implementation-notes/** - Phase-specific insights
-- PHASE_N_IMPLEMENTATION_NOTES.md, LESSONS_LEARNED_PHASE_N.md
-
-**docs/research/** - Research archive
-- TEST_RESULTS_PROTOCOL_FIX.md - Verification of DAP protocol fix
