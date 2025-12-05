@@ -8,5 +8,4 @@ stepIn
 stackTrace
 stepOut
 stackTrace
-terminate
 disconnect
