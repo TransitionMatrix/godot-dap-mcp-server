@@ -52,9 +52,9 @@
   - Verified with manual game launch + breakpoints integration test
   - Integration test script created (`scripts/run-dap-scenario.sh`)
 
-- ✅ **Phase 6: Advanced Tools** - COMPLETE (Limitations Noted)
+- ✅ **Phase 6: Advanced Tools** - COMPLETE (Limitations Verified)
   - ✅ `godot_pause`: Implemented and verified (timeout fixed).
-  - ⚠️ `godot_set_variable`: Implemented but limited by Godot Engine (advertises support but implementation missing). Workarounds attempted but unreliable. PR to Godot Engine required for full support.
+  - ⚠️ `godot_set_variable`: Implemented but disabled. Godot Engine advertises support but lacks implementation. Integration test confirms graceful error message. PR to Godot Engine required.
 
 - ✅ **Phase 7: Architecture Refactor (Event Handling)** - COMPLETE (2025-11-25)
   - Implemented Event-Driven State Machine (transition on events, not requests).

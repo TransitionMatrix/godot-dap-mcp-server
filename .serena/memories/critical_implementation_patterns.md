@@ -141,3 +141,28 @@ regexp.MatchString(`^[a-zA-Z_][a-zA-Z0-9_]*$`, name)
 ```go
 { Name: "value", Type: "" } // Omitted = any
 ```
+
+## 11. Attach Handshake Pattern (Phase 5.5)
+
+**Problem**: Attaching to a running game requires a different sequence than launching.
+
+**Solution**: Use `attach` request followed by `configurationDone`.
+
+```go
+// 1. Connect & Initialize
+session.Connect(ctx)
+session.Initialize(ctx)
+
+// 2. Attach
+// Client sends Attach request
+client.Send(AttachRequest)
+
+// 3. Signal Ready
+// Client sends ConfigurationDone immediately after Attach
+client.Send(ConfigurationDoneRequest)
+
+// 4. Wait for Process Event
+// Godot sends 'process' event to indicate successful attachment
+client.WaitForAttach()
+// State: Attached
+```

@@ -316,6 +316,35 @@ func (c *Client) ConfigurationDone(ctx context.Context) error {
     return err
 }
 
+func (c *Client) Attach(ctx context.Context) (*dap.AttachResponse, error) {
+    request := &dap.AttachRequest{
+        Request: dap.Request{
+            ProtocolMessage: dap.ProtocolMessage{
+                Seq:  c.nextRequestSeq(),
+                Type: "request",
+            },
+            Command: "attach",
+        },
+        Arguments: map[string]interface{}{}, // No arguments required for Godot attach
+    }
+
+    if err := c.write(request); err != nil {
+        return nil, fmt.Errorf("failed to write attach request: %w", err)
+    }
+
+    msg, err := c.waitForResponse(ctx, "attach")
+    if err != nil {
+        return nil, err
+    }
+
+    resp, ok := msg.(*dap.AttachResponse)
+    if !ok {
+        return nil, fmt.Errorf("unexpected response type: %T", msg)
+    }
+
+    return resp, nil
+}
+
 // SetBreakpoints sets breakpoints for a file
 func (c *Client) SetBreakpoints(ctx context.Context, file string, lines []int) error {
     breakpoints := make([]dap.SourceBreakpoint, len(lines))
@@ -880,6 +909,70 @@ func RegisterConnectTool(server *mcp.Server, dapClient *dap.Client) {
                 "status": "connected",
                 "port":   port,
                 "capabilities": caps,
+            }, nil
+        },
+    })
+}
+```
+
+### Example: attach.go
+
+Attach tool implementation:
+
+```go
+package tools
+
+import (
+    "fmt"
+    "context"
+
+    "your-repo/internal/dap"
+    "your-repo/internal/mcp"
+)
+
+func RegisterAttachTool(server *mcp.Server, dapClient *dap.Client) {
+    server.RegisterTool(mcp.Tool{
+        Name: "godot_attach",
+        Description: `Attach the debugger to an already running Godot game instance.
+
+        This tool connects to a game that is already running and waiting for a debugger.
+        The game must have been started with debugging enabled and configured to connect
+        to the editor's port (usually 6007).
+
+        Prerequisites:
+        - Must be connected to Godot DAP server (call godot_connect first)
+        - Must complete DAP configuration handshake
+        - Game must be running and attempting to connect to the editor
+
+        Use this tool:
+        - When you want to debug a game that was launched externally
+        - When you want to attach to a game running on a device
+        - As an alternative to launching the game through the DAP server
+
+        Attach Flow:
+        1. Sends attach request
+        2. Sends configurationDone
+        3. Debugger attaches to the running game session
+
+        Example: Attach to running game
+        godot_attach()`,
+
+        Parameters: []mcp.Parameter{}, // No parameters required
+
+        Handler: func(params map[string]interface{}) (interface{}, error) {
+            // Check connection state
+            session, err := GetSession()
+            if err != nil {
+                return nil, err
+            }
+
+            // Perform attach
+            if err := session.Attach(context.Background()); err != nil {
+                 return nil, fmt.Errorf("failed to attach: %w", err)
+            }
+
+            return map[string]interface{}{
+                "status": "attached",
             }, nil
         },
     })

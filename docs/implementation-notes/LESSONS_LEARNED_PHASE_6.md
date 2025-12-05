@@ -97,55 +97,18 @@ mcp__godot-source__search_for_pattern(
 # bool supportsSetVariable = true;  // FALSE ADVERTISING!
 ```
 
-**The Bug**: Godot advertises `supportsSetVariable: true` but has no `req_setVariable()` method. Similar to the `stepOut` issue from Phase 3—the capability is advertised but not implemented.
+**The Bug**: Godot advertises `supportsSetVariable: true` but has no `req_setVariable()` method. This is **false advertising** similar to the `stepOut` issue.
 
-**Workaround**: Use `evaluate()` with assignment expression:
+**Impact**: Cannot directly modify variable values via DAP setVariable command.
 
-```go
-func (t *SetVariableTool) Execute(args map[string]interface{}) (interface{}, error) {
-    varName := args["variable_name"].(string)
-    value := args["value"]
+**Attempted Workaround**: Use `evaluate()` with assignment expression.
 
-    // SECURITY: Validate variable name to prevent code injection
-    if !isValidVariableName(varName) {
-        return nil, fmt.Errorf("invalid variable name: %s", varName)
-    }
+**Final Outcome**: **FAILED**.
+While `evaluate()` works for expressions (`1 + 1`), GDScript treats variable assignment (`a = 1`) as a **statement**, not an expression. Attempts to evaluate an assignment string return a parser error in Godot.
 
-    // Build assignment expression
-    expression := fmt.Sprintf("%s = %s", varName, formatValueForGDScript(value))
+**Decision**: The `godot_set_variable` tool is registered but explicitly returns a helpful error message explaining why it is unavailable and what the future fix involves (upstream PR to Godot).
 
-    // Use existing evaluate() method
-    result, err := client.Evaluate(ctx, expression, frameId, "repl")
-    if err != nil {
-        return nil, fmt.Errorf("failed to set variable: %w", err)
-    }
-
-    return map[string]interface{}{
-        "variable": varName,
-        "value":    result.Result,
-        "type":     result.Type,
-    }, nil
-}
-```
-
-**Security Requirement**: Variable names must be strictly validated:
-
-```go
-func isValidVariableName(name string) bool {
-    // Only allow: letters, numbers, underscores
-    // Must start with letter or underscore
-    matched, _ := regexp.MatchString(`^[a-zA-Z_][a-zA-Z0-9_]*$`, name)
-    return matched
-}
-```
-
-**Why This Matters**:
-- ✅ Valid: `player_health`
-- ❌ Attack: `health = 0; get_node("/root").queue_free()`
-
-Without validation, attackers could execute arbitrary GDScript code.
-
-**Lesson**: Always verify claimed DAP capabilities by checking Godot source. Don't trust capability advertisements—both `stepOut` and `setVariable` were falsely advertised.
+**Lesson**: Language semantics matter. Even if `evaluate` exists, it may not support statements like assignment. Always verify claimed DAP capabilities by checking Godot source. Don't trust capability advertisements.
 
 ---
 
