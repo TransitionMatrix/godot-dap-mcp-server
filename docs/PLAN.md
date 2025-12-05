@@ -1,7 +1,7 @@
 # Godot DAP MCP Server - Implementation Plan
 
 **Date**: 2025-11-05
-**Last Updated**: 2025-11-08
+**Last Updated**: 2025-12-04
 **Language**: Go
 **Purpose**: MCP server providing interactive runtime debugging for Godot games via DAP protocol
 
@@ -44,6 +44,13 @@
   - Project path validation
   - Unit tests passing
   - Integration verification of tool registration
+
+- ✅ **Phase 5.5: Attach Request** - COMPLETE (2025-12-04)
+  - All success criteria met
+  - `godot_attach` tool implemented
+  - `Attach()` and `AttachWithConfigurationDone()` methods added to DAP client
+  - Verified with manual game launch + breakpoints integration test
+  - Integration test script created (`scripts/run-dap-scenario.sh`)
 
 - ✅ **Phase 6: Advanced Tools** - COMPLETE (Limitations Noted)
   - ✅ `godot_pause`: Implemented and verified (timeout fixed).
@@ -311,6 +318,39 @@ This plan references detailed documentation in separate files:
 
 ---
 
+### Phase 5.5: Attach Request - ✅ COMPLETE
+
+**Goal**: Implement `godot_attach` to connect to an already running game
+
+**Tool to Implement**:
+1. ✅ `godot_attach` - Attach debugger to running game session
+
+**Implementation Details**:
+- **Godot Behavior**:
+  - `req_attach` ignores all arguments (verified in `debug_adapter_parser.cpp`).
+  - Checks `ScriptEditorDebugger::is_session_active()`.
+  - If no game is running, returns `NOT_RUNNING` error.
+  - If game is running, sets `attached = true` and sends `process` event.
+- **Protocol Flow**:
+  - Connect TCP (`godot_connect`)
+  - Send `attach` request (instead of `launch`)
+  - Send `configurationDone`
+  - Debugger is now attached to running game
+
+**Work Required**:
+- ✅ Implement `Attach()` method in DAP client
+- ✅ Create `godot_attach` tool (no arguments required)
+- ✅ Add integration test (start game manually, then attach)
+
+**Success Criteria**:
+- ✅ Can attach to a game that was started via Godot Editor (F5)
+- ✅ Can pause/step/inspect after attaching
+- ✅ Fails gracefully if no game is running
+
+**Completion Date**: 2025-12-04
+
+---
+
 ### Phase 6: Advanced Tools - ⏳ PARTIALLY COMPLETE
 
 **Goal**: Add nice-to-have debugging tools
@@ -399,11 +439,12 @@ This plan references detailed documentation in separate files:
 | 3. Core Debugging Tools | 1 | HIGH | ✅ COMPLETE | 7 essential tools + tests |
 | 4. Inspection Tools | 1 | HIGH | 🔲 PENDING | 5 inspection tools |
 | 5. Launch Tools | 1 | MEDIUM | ✅ COMPLETE | 3 launch variants |
+| 5.5. Attach Request | 1 | MEDIUM | 🔲 PENDING | Attach to running game |
 | 6. Advanced Tools | 1 | OPTIONAL | ❌ NON-FUNCTIONAL | godot_set_variable is broken |
 | 7. Event Arch Refactor | 2 | CRITICAL | 🔲 PENDING | Robust event handling |
 | 8. Error Handling | 1 | HIGH | 🔲 PENDING | Timeouts, recovery, paths |
 | 9. Documentation | 1 | HIGH | 🔲 PENDING | Complete docs |
-| **Total** | **6-7 days** | | | **Production-ready server** |
+| **Total** | **7-8 days** | | | **Production-ready server** |
 
 ---
 
@@ -412,6 +453,7 @@ This plan references detailed documentation in separate files:
 ### Functional Metrics
 - ✅ All core debugging tools working (connect, breakpoints, stepping, inspection)
 - ✅ Launch functionality working (main, custom, current scenes)
+- ⏳ Can attach to existing game sessions
 - ⏳ No permanent hangs (timeout mechanisms working)
 - ⏳ Clear error messages on failure
 
@@ -431,6 +473,13 @@ This plan references detailed documentation in separate files:
 ---
 
 ## Next Steps
+
+### Immediate Actions (Phase 5.5 Implementation)
+
+1. **Implement `godot_attach`**:
+   - Add `Attach()` to DAP client.
+   - Implement `godot_attach` tool.
+   - Verify with running Godot instance.
 
 ### Immediate Actions (Phase 6 Verification)
 

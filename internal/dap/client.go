@@ -103,6 +103,8 @@ func (c *Client) handleMessage(msg dap.Message) {
 		c.dispatchResponse(m.RequestSeq, m)
 	case *dap.LaunchResponse:
 		c.dispatchResponse(m.RequestSeq, m)
+	case *dap.AttachResponse:
+		c.dispatchResponse(m.RequestSeq, m)
 	case *dap.SetBreakpointsResponse:
 		c.dispatchResponse(m.RequestSeq, m)
 	case *dap.ContinueResponse:
@@ -865,4 +867,140 @@ func (c *Client) LaunchWithConfigurationDone(ctx context.Context, args map[strin
 	}
 
 	return launchResp, nil
+}
+
+// Attach sends an attach request to connect to an already running Godot game.
+// Note: The attach request only stores parameters. The connection won't actually happen
+// until configurationDone() is called after this.
+func (c *Client) Attach(ctx context.Context, args map[string]interface{}) (*dap.AttachResponse, error) {
+	// Marshal arguments to JSON
+	argsJSON, err := json.Marshal(args)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal attach arguments: %w", err)
+	}
+
+	request := &dap.AttachRequest{
+		Request: dap.Request{
+			ProtocolMessage: dap.ProtocolMessage{
+				Seq:  c.nextRequestSeq(),
+				Type: "request",
+			},
+			Command: "attach",
+		},
+		Arguments: argsJSON,
+	}
+
+	resp, err := c.sendRequestAndWait(ctx, request)
+	if err != nil {
+		return nil, err
+	}
+
+	attachResp, ok := resp.(*dap.AttachResponse)
+	if !ok {
+		return nil, fmt.Errorf("unexpected response type: %T", resp)
+	}
+
+	return attachResp, nil
+}
+
+// AttachWithConfigurationDone sends an attach request followed immediately by configurationDone.
+// This is required for Godot, which only sends the attach response AFTER receiving configurationDone.
+func (c *Client) AttachWithConfigurationDone(ctx context.Context, args map[string]interface{}) (*dap.AttachResponse, error) {
+	// Marshal arguments to JSON
+	argsJSON, err := json.Marshal(args)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal attach arguments: %w", err)
+	}
+
+	attachRequest := &dap.AttachRequest{
+		Request: dap.Request{
+			ProtocolMessage: dap.ProtocolMessage{
+				Seq:  c.nextRequestSeq(),
+				Type: "request",
+			},
+			Command: "attach",
+		},
+		Arguments: argsJSON,
+	}
+	
+	configDoneRequest := &dap.ConfigurationDoneRequest{
+		Request: dap.Request{
+			ProtocolMessage: dap.ProtocolMessage{
+				Seq:  c.nextRequestSeq(),
+				Type: "request",
+			},
+			Command: "configurationDone",
+		},
+	}
+
+	// Use channels to wait
+	attachSeq := attachRequest.Seq
+	configSeq := configDoneRequest.Seq
+	
+	attachCh := make(chan dap.Message, 1)
+	configCh := make(chan dap.Message, 1)
+	
+	c.reqMu.Lock()
+	c.pendingReqs[attachSeq] = attachCh
+	c.pendingReqs[configSeq] = configCh
+	c.reqMu.Unlock()
+	
+	defer func() {
+		c.reqMu.Lock()
+		delete(c.pendingReqs, attachSeq)
+		delete(c.pendingReqs, configSeq)
+		c.reqMu.Unlock()
+	}()
+	
+	log.Println("DEBUG: Sending Attach Request...")
+	if err := c.write(attachRequest); err != nil {
+		return nil, fmt.Errorf("failed to send attach request: %w", err)
+	}
+	
+	log.Println("DEBUG: Sending ConfigurationDone Request...")
+	if err := c.write(configDoneRequest); err != nil {
+		return nil, fmt.Errorf("failed to send configurationDone request: %w", err)
+	}
+	
+	// Wait for both
+	var attachResp *dap.AttachResponse
+	
+	// We need to collect both. Order doesn't matter.
+	timeout := time.After(30 * time.Second) // Default timeout
+	if d, ok := ctx.Deadline(); ok {
+		timeout = time.After(time.Until(d))
+	}
+	
+	gotAttach := false
+	gotConfig := false
+	
+	for !gotAttach || !gotConfig {
+		select {
+		case msg := <-attachCh:
+			gotAttach = true
+			if m, ok := msg.(*dap.AttachResponse); ok {
+				if !m.Success {
+					return nil, fmt.Errorf("attach failed: %s", m.Message)
+				}
+				attachResp = m
+			} else if m, ok := msg.(*dap.ErrorResponse); ok {
+				return nil, fmt.Errorf("attach error: %s", m.Message)
+			}
+		case msg := <-configCh:
+			gotConfig = true
+			if m, ok := msg.(*dap.ConfigurationDoneResponse); ok {
+				if !m.Success {
+					return nil, fmt.Errorf("configurationDone failed: %s", m.Message)
+				}
+			} else if m, ok := msg.(*dap.ErrorResponse); ok {
+				return nil, fmt.Errorf("configurationDone error: %s", m.Message)
+			}
+		case <-ctx.Done():
+			return nil, ctx.Err()
+		case <-timeout:
+			return nil, fmt.Errorf("timeout waiting for attach/configDone responses")
+		}
+	}
+
+	return attachResp, nil
 }

@@ -169,5 +169,15 @@ func (s *Session) LaunchCustomScene(ctx context.Context, projectPath string, sce
 	return s.LaunchGodotScene(ctx, config)
 }
 
+// AttachGodot attaches the debugger to an already running Godot game instance.
+// The game must have been started with --remote-debug connecting to the editor.
+func (s *Session) AttachGodot(ctx context.Context) (*dap.AttachResponse, error) {
+	// Attach takes no arguments in Godot implementation
+	args := map[string]interface{}{}
+	
+	// Attach with the Godot-specific sequence (Attach -> ConfigurationDone)
+	return s.client.AttachWithConfigurationDone(ctx, args)
+}
+
 // Additional Godot-specific DAP commands can be added here as needed
 // For example: breakpoint management, stepping, evaluation, etc.

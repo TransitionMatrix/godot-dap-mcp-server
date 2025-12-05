@@ -27,7 +27,7 @@ godot_disconnect()
 
 ---
 
-## Launch Tools
+## Launch & Attach Tools
 
 ### `godot_launch_main_scene`
 Launches the project's main scene (defined in `project.godot`).
@@ -67,6 +67,19 @@ Launches the scene currently open in the Godot editor.
 **Example**:
 ```python
 godot_launch_current_scene(project="/Users/me/my-game")
+```
+
+### `godot_attach`
+Attaches the debugger to an already running Godot game instance.
+
+The game must have been launched with debugging enabled and configured to connect to the editor's port (default: 6007).
+
+**Prerequisites**:
+- Game must be running and waiting for debugger connection.
+
+**Example**:
+```python
+godot_attach()
 ```
 
 ---

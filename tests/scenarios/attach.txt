@@ -1,0 +1,12 @@
+initialize
+attach
+setBreakpoints
+configurationDone
+next
+stackTrace
+stepIn
+stackTrace
+stepOut
+stackTrace
+terminate
+disconnect
