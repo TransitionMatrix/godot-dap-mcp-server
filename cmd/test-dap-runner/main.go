@@ -53,20 +53,20 @@ func init() {
 				"type":    "request",
 				"command": "initialize",
 				"arguments": map[string]interface{}{
-					"adapterID": "godot",
-					"clientID":   "godot-dap-mcp-server",
-					"clientName": "Godot DAP MCP Server",
-					"linesStartAt1":   true,
-					"columnsStartAt1": true,
-					"supportsVariableType": true,
-					"pathFormat": "path",
+					"adapterID":                    "godot",
+					"clientID":                     "godot-dap-mcp-server",
+					"clientName":                   "Godot DAP MCP Server",
+					"linesStartAt1":                true,
+					"columnsStartAt1":              true,
+					"supportsVariableType":         true,
+					"pathFormat":                   "path",
 					"supportsInvalidatedEvent":     false,
 					"supportsProgressReporting":    false,
 					"supportsRunInTerminalRequest": false,
 					"supportsVariablePaging":       false,
 				},
 			},
-			SpecRequired: []string{"seq", "type", "command", "arguments", "arguments.adapterID"},
+			SpecRequired:  []string{"seq", "type", "command", "arguments", "arguments.adapterID"},
 			ExpectedError: "(none - should work cleanly)",
 			Timeout:       2 * time.Second,
 		},
@@ -249,8 +249,12 @@ func main() {
 
 		// Check for events
 		term, exited := checkTerminationEvents(messages)
-		if term { receivedTerminated = true }
-		if exited { receivedExited = true }
+		if term {
+			receivedTerminated = true
+		}
+		if exited {
+			receivedExited = true
+		}
 
 		// Short circuit if we are disconnecting and already exited (logic from original)
 		if cmdName == "disconnect" && receivedExited {

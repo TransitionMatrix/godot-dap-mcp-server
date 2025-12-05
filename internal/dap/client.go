@@ -760,16 +760,16 @@ func (c *Client) LaunchWithConfigurationDone(ctx context.Context, args map[strin
 	// But my simulation showed LaunchResponse came back.
 	// However, the comment "This is required for Godot, which only sends the launch response AFTER receiving configurationDone"
 	// contradicts my finding or implies a deadlock risk.
-	
+
 	// Let's assume Godot MIGHT block launch response.
 	// If so, we should send both requests asynchronously?
 	// But sendRequestAndWait blocks.
-	
+
 	// If Godot waits for configDone to send launch response, we CANNOT wait for launch response before sending configDone.
 	// We must send Launch, then Send ConfigDone, then wait for both.
-	
+
 	// To do this with sendRequestAndWait, we'd need goroutines.
-	
+
 	// Marshal arguments to JSON
 	argsJSON, err := json.Marshal(args)
 	if err != nil {
@@ -786,7 +786,7 @@ func (c *Client) LaunchWithConfigurationDone(ctx context.Context, args map[strin
 		},
 		Arguments: argsJSON,
 	}
-	
+
 	configDoneRequest := &dap.ConfigurationDoneRequest{
 		Request: dap.Request{
 			ProtocolMessage: dap.ProtocolMessage{
@@ -800,44 +800,44 @@ func (c *Client) LaunchWithConfigurationDone(ctx context.Context, args map[strin
 	// Use channels to wait
 	launchSeq := launchRequest.Seq
 	configSeq := configDoneRequest.Seq
-	
+
 	launchCh := make(chan dap.Message, 1)
 	configCh := make(chan dap.Message, 1)
-	
+
 	c.reqMu.Lock()
 	c.pendingReqs[launchSeq] = launchCh
 	c.pendingReqs[configSeq] = configCh
 	c.reqMu.Unlock()
-	
+
 	defer func() {
 		c.reqMu.Lock()
 		delete(c.pendingReqs, launchSeq)
 		delete(c.pendingReqs, configSeq)
 		c.reqMu.Unlock()
 	}()
-	
+
 	log.Println("DEBUG: Sending Launch Request...")
 	if err := c.write(launchRequest); err != nil {
 		return nil, fmt.Errorf("failed to send launch request: %w", err)
 	}
-	
+
 	log.Println("DEBUG: Sending ConfigurationDone Request...")
 	if err := c.write(configDoneRequest); err != nil {
 		return nil, fmt.Errorf("failed to send configurationDone request: %w", err)
 	}
-	
+
 	// Wait for both
 	var launchResp *dap.LaunchResponse
-	
+
 	// We need to collect both. Order doesn't matter.
 	timeout := time.After(30 * time.Second) // Default timeout
 	if d, ok := ctx.Deadline(); ok {
 		timeout = time.After(time.Until(d))
 	}
-	
+
 	gotLaunch := false
 	gotConfig := false
-	
+
 	for !gotLaunch || !gotConfig {
 		select {
 		case msg := <-launchCh:
@@ -922,7 +922,7 @@ func (c *Client) AttachWithConfigurationDone(ctx context.Context, args map[strin
 		},
 		Arguments: argsJSON,
 	}
-	
+
 	configDoneRequest := &dap.ConfigurationDoneRequest{
 		Request: dap.Request{
 			ProtocolMessage: dap.ProtocolMessage{
@@ -936,44 +936,44 @@ func (c *Client) AttachWithConfigurationDone(ctx context.Context, args map[strin
 	// Use channels to wait
 	attachSeq := attachRequest.Seq
 	configSeq := configDoneRequest.Seq
-	
+
 	attachCh := make(chan dap.Message, 1)
 	configCh := make(chan dap.Message, 1)
-	
+
 	c.reqMu.Lock()
 	c.pendingReqs[attachSeq] = attachCh
 	c.pendingReqs[configSeq] = configCh
 	c.reqMu.Unlock()
-	
+
 	defer func() {
 		c.reqMu.Lock()
 		delete(c.pendingReqs, attachSeq)
 		delete(c.pendingReqs, configSeq)
 		c.reqMu.Unlock()
 	}()
-	
+
 	log.Println("DEBUG: Sending Attach Request...")
 	if err := c.write(attachRequest); err != nil {
 		return nil, fmt.Errorf("failed to send attach request: %w", err)
 	}
-	
+
 	log.Println("DEBUG: Sending ConfigurationDone Request...")
 	if err := c.write(configDoneRequest); err != nil {
 		return nil, fmt.Errorf("failed to send configurationDone request: %w", err)
 	}
-	
+
 	// Wait for both
 	var attachResp *dap.AttachResponse
-	
+
 	// We need to collect both. Order doesn't matter.
 	timeout := time.After(30 * time.Second) // Default timeout
 	if d, ok := ctx.Deadline(); ok {
 		timeout = time.After(time.Until(d))
 	}
-	
+
 	gotAttach := false
 	gotConfig := false
-	
+
 	for !gotAttach || !gotConfig {
 		select {
 		case msg := <-attachCh:

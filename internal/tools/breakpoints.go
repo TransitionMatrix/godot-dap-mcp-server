@@ -102,22 +102,22 @@ godot_set_breakpoint(file="/Users/dev/myproject/player.gd", line=12)`,
 			bp := resp.Body.Breakpoints[0]
 			if !bp.Verified {
 				return map[string]interface{}{
-					"status":   "unverified",
-					"message":  "Breakpoint set but not verified by Godot",
-					"file":     file,
+					"status":         "unverified",
+					"message":        "Breakpoint set but not verified by Godot",
+					"file":           file,
 					"requested_line": line,
 					"actual_line":    bp.Line,
-					"reason":   "File may not be loaded or line may not be executable",
+					"reason":         "File may not be loaded or line may not be executable",
 				}, nil
 			}
 
 			result := map[string]interface{}{
-				"status":          "verified",
-				"message":         fmt.Sprintf("Breakpoint set at %s:%d", file, bp.Line),
-				"file":            file,
-				"requested_line":  line,
-				"actual_line":     bp.Line,
-				"id":              bp.Id,
+				"status":         "verified",
+				"message":        fmt.Sprintf("Breakpoint set at %s:%d", file, bp.Line),
+				"file":           file,
+				"requested_line": line,
+				"actual_line":    bp.Line,
+				"id":             bp.Id,
 			}
 
 			// Add message if line was adjusted

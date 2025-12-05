@@ -78,8 +78,8 @@ godot_continue(thread_id=1)`,
 			}
 
 			return map[string]interface{}{
-				"status":           "continued",
-				"message":          "Execution resumed",
+				"status":                "continued",
+				"message":               "Execution resumed",
 				"all_threads_continued": resp.Body.AllThreadsContinued,
 			}, nil
 		},

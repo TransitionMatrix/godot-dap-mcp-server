@@ -370,7 +370,7 @@ Example: Scene tree navigation workflow
 				)
 			}
 
-				// Format variables with Godot-specific formatting
+			// Format variables with Godot-specific formatting
 			variables := formatVariableList(resp.Body.Variables)
 
 			return map[string]interface{}{

@@ -233,7 +233,7 @@ func formatNode(typeName string, value string) string {
 	// Godot shows class name for nodes
 	// Value often looks like: "<Node#123>" or "Node:<CharacterBody2D#456>"
 	if value == "<null>" || value == "null" {
-	return fmt.Sprintf("%s(null)", typeName)
+		return fmt.Sprintf("%s(null)", typeName)
 	}
 
 	// Extract instance ID if present
@@ -273,9 +273,9 @@ func isNodeType(typeName string) bool {
 
 	// If it contains "Node", "Body", "Area", or "Control", it's likely a Node
 	return strings.Contains(typeName, "Node") ||
-	       strings.Contains(typeName, "Body") ||
-	       strings.Contains(typeName, "Area") ||
-	       strings.Contains(typeName, "Control")
+		strings.Contains(typeName, "Body") ||
+		strings.Contains(typeName, "Area") ||
+		strings.Contains(typeName, "Control")
 }
 
 // parseParenthesizedValues extracts comma-separated values from "(val1, val2, ...)"

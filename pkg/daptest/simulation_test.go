@@ -34,7 +34,7 @@ func TestGodotLaunchSimulation(t *testing.T) {
 			return
 		}
 		req := msg.(*godap.InitializeRequest)
-		
+
 		// Send response
 		server.Send(&godap.InitializeResponse{
 			Response: godap.Response{
@@ -47,7 +47,7 @@ func TestGodotLaunchSimulation(t *testing.T) {
 				Command:    "initialize",
 			},
 		})
-		
+
 		// Send "initialized" event immediately after response (standard DAP)
 		server.Send(&godap.InitializedEvent{
 			Event: godap.Event{
@@ -85,7 +85,7 @@ func TestGodotLaunchSimulation(t *testing.T) {
 				Command:    "launch",
 			},
 		})
-		
+
 		// Godot sends "process" event
 		server.Send(&godap.ProcessEvent{
 			Event: godap.Event{
@@ -103,10 +103,10 @@ func TestGodotLaunchSimulation(t *testing.T) {
 
 	// We need to call LaunchMainScene
 	// But LaunchMainScene expects to read "project.godot" to validate.
-	// We can bypass session logic and use client.Launch directly? 
+	// We can bypass session logic and use client.Launch directly?
 	// Or we can mock the file system?
 	// client.Launch just sends the request.
-	
+
 	// Let's use client directly for now to test the event handling
 	launchArgs := map[string]interface{}{
 		"project": "/tmp/test",
@@ -136,7 +136,7 @@ func TestGodotLaunchSimulation(t *testing.T) {
 				Command:    "configurationDone",
 			},
 		})
-		
+
 		// Godot then sends "stopped" event (entry point)
 		// Wait a tiny bit to simulate async
 		time.Sleep(10 * time.Millisecond)

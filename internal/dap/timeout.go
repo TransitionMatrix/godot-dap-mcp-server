@@ -7,9 +7,9 @@ import (
 
 const (
 	// Default timeouts for different operation types
-	DefaultConnectTimeout  = 10 * time.Second
-	DefaultCommandTimeout  = 30 * time.Second
-	DefaultReadTimeout     = 5 * time.Second
+	DefaultConnectTimeout = 10 * time.Second
+	DefaultCommandTimeout = 30 * time.Second
+	DefaultReadTimeout    = 5 * time.Second
 )
 
 // WithConnectTimeout creates a context with the default connect timeout

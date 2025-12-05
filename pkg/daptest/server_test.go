@@ -38,7 +38,7 @@ func TestMockServer(t *testing.T) {
 
 	body, _ := json.Marshal(req)
 	// header := fmt.Sprintf("Content-Length: %d\r\n\r\n", len(body))
-	
+
 	conn.Write([]byte("Content-Length: " + strconv.Itoa(len(body)) + "\r\n\r\n"))
 	conn.Write(body)
 }
@@ -47,9 +47,9 @@ func TestMockServer_RoundTrip(t *testing.T) {
 	server := NewServer(t)
 	defer server.Close()
 
-	// Use real DAP client to talk to it? 
+	// Use real DAP client to talk to it?
 	// Or just raw net.Conn for simplicity in this unit test.
-	
+
 	conn, err := net.Dial("tcp", server.Address())
 	if err != nil {
 		t.Fatalf("Failed to connect: %v", err)
@@ -69,9 +69,9 @@ func TestMockServer_RoundTrip(t *testing.T) {
 			AdapterID: "test",
 		},
 	}
-	
+
 	reqBytes, _ := json.Marshal(req)
-	conn.Write([]byte("Content-Length: " +  strconv.Itoa(len(reqBytes)) + "\r\n\r\n"))
+	conn.Write([]byte("Content-Length: " + strconv.Itoa(len(reqBytes)) + "\r\n\r\n"))
 	conn.Write(reqBytes)
 
 	// Server expects request
@@ -100,7 +100,7 @@ func TestMockServer_RoundTrip(t *testing.T) {
 			Command:    "initialize",
 		},
 	}
-	
+
 	if err := server.Send(resp); err != nil {
 		t.Fatalf("Send failed: %v", err)
 	}
@@ -116,4 +116,3 @@ func TestMockServer_RoundTrip(t *testing.T) {
 		t.Errorf("Expected InitializeResponse, got %T", respMsg)
 	}
 }
-

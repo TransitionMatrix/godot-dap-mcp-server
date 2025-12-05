@@ -157,7 +157,7 @@ func (s *MockServer) readLoop(conn net.Conn) {
 			s.errors <- fmt.Errorf("dap decode error: %v", err)
 			continue
 		}
-		
+
 		s.receivedMsgs <- decodedMsg
 	}
 }
@@ -195,7 +195,7 @@ func (s *MockServer) ExpectRequest(command string) (dap.Message, error) {
 		if val.Kind() == reflect.Ptr {
 			val = val.Elem()
 		}
-		
+
 		msgType := ""
 		typeField := val.FieldByName("Type")
 		if typeField.IsValid() && typeField.Kind() == reflect.String {
@@ -219,7 +219,7 @@ func (s *MockServer) ExpectRequest(command string) (dap.Message, error) {
 		// Extract command using reflection since go-dap returns specific structs
 		// (e.g. *dap.InitializeRequest) which don't share a common Command interface
 		// val is already the value
-		
+
 		cmdField := val.FieldByName("Command")
 		if !cmdField.IsValid() || cmdField.Kind() != reflect.String {
 			// Try embedded Request struct

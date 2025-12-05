@@ -21,7 +21,7 @@ func resolveGodotPath(path string, projectRoot string) (string, error) {
 		if projectRoot == "" {
 			return "", fmt.Errorf("cannot resolve res:// path '%s': project root not set. Please provide 'project' argument in godot_connect or use absolute path", path)
 		}
-		
+
 		relativePath := strings.TrimPrefix(path, "res://")
 		return filepath.Join(projectRoot, relativePath), nil
 	}

@@ -25,10 +25,10 @@ func (c *Client) initEventHandling() {
 // WaitForStop waits for a stopped event
 func (c *Client) WaitForStop(ctx context.Context) (*dap.StoppedEventBody, error) {
 	log.Printf("Waiting for stopped event...")
-	
+
 	events, cleanup := c.SubscribeToEvents()
 	defer cleanup()
-	
+
 	for {
 		select {
 		case <-ctx.Done():

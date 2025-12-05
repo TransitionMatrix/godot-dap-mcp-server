@@ -6,7 +6,7 @@ import (
 )
 
 // FormatError creates a structured error message following the Problem + Context + Solution pattern.
-// 
+//
 // problem: A clear statement of what went wrong (e.g., "Failed to connect to Godot DAP server")
 // context: Relevant details (e.g., "localhost:6006") or ""
 // solutions: A list of actionable steps the user can take
@@ -24,12 +24,12 @@ func FormatError(problem string, context string, solutions []string, cause error
 	// 2. Context (Optional - if detailed context is needed, it can be part of problem or a separate arg)
 	// For now, we assume 'context' arg matches the simple "host:port" style.
 	// If we wanted a detailed "Context:" section, we could add it.
-	
+
 	// 3. Possible Causes (inferred from typical scenarios, but passed as solutions usually imply causes)
 	// Actually, let's stick to the requested pattern:
 	// "Possible causes:" section?
 	// The existing example in connect.go uses "Possible causes" and "Solutions".
-	
+
 	// Let's make it flexible. If solutions are provided:
 	if len(solutions) > 0 {
 		sb.WriteString("Suggestions:\n")

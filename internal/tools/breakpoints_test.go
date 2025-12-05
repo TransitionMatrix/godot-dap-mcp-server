@@ -16,7 +16,7 @@ func TestBreakpointTools_Registration(t *testing.T) {
 
 func TestResolveGodotPath(t *testing.T) {
 	projectRoot := "/Users/dev/project"
-	
+
 	tests := []struct {
 		name        string
 		path        string
@@ -82,4 +82,3 @@ func TestBreakpointTools_RequireSession(t *testing.T) {
 		t.Error("Breakpoint tools should require an active session")
 	}
 }
-

@@ -174,7 +174,7 @@ func (s *Session) LaunchCustomScene(ctx context.Context, projectPath string, sce
 func (s *Session) AttachGodot(ctx context.Context) (*dap.AttachResponse, error) {
 	// Attach takes no arguments in Godot implementation
 	args := map[string]interface{}{}
-	
+
 	// Attach with the Godot-specific sequence (Attach -> ConfigurationDone)
 	return s.client.AttachWithConfigurationDone(ctx, args)
 }

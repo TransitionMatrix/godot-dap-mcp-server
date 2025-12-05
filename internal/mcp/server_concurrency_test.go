@@ -77,7 +77,7 @@ func TestServer_Concurrency(t *testing.T) {
 
 	// 8. Read responses
 	decoder := json.NewDecoder(outReader)
-	
+
 	// We expect response 2 to arrive quickly, even though request 1 is blocked
 	done := make(chan struct{})
 	go func() {
@@ -127,6 +127,6 @@ func TestServer_Concurrency(t *testing.T) {
 	}
 
 	// 10. Cleanup
-	close(blockCh) // Unblock tool 1
+	close(blockCh)   // Unblock tool 1
 	inWriter.Close() // Stop server
 }
