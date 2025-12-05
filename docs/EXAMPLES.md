@@ -94,3 +94,44 @@ Scenario: Player health is not decreasing correctly.
    ```python
    godot_continue()
    ```
+
+## Workflow 4: Attaching to a Running Game
+
+Scenario: You have a game already running (e.g., launched via Godot Editor) and want to attach the debugger to it without restarting.
+
+### Standard Method (GUI Editor)
+
+1. **Launch Godot Editor**: Open your project in the Godot Editor.
+2. **Run Game**: Press F5 (Play) to start the game.
+3. **Attach**: Use the MCP server to attach.
+   ```python
+   godot_connect(project="/path/to/game")
+   godot_attach()
+   ```
+4. **Debug**: You are now attached. You can pause, step, or inspect the game.
+
+### Advanced Method (CLI / Headless)
+
+Scenario: You want to debug a game running in a headless environment (CI/CD) or manually started via command line.
+
+1. **Start Editor (Debugger Server)**:
+   Start the editor in listening mode. This acts as the bridge between the game and the MCP server.
+   ```bash
+   # Standard (GUI)
+   godot --editor --path /path/to/game --debug-server tcp://127.0.0.1:6007
+
+   # Headless (No Window)
+   godot --headless --editor --path /path/to/game --debug-server tcp://127.0.0.1:6007
+   ```
+
+2. **Start Game (Debuggee)**:
+   Launch the game instance and tell it to connect to the debugger.
+   ```bash
+   godot --path /path/to/game --remote-debug tcp://127.0.0.1:6007
+   ```
+
+3. **Attach**:
+   ```python
+   godot_connect(project="/path/to/game")
+   godot_attach()
+   ```

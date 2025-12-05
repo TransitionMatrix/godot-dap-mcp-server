@@ -27,12 +27,33 @@ BLUE='\033[0;34m'
 NC='\033[0m' # No Color
 
 # Check arguments
-if [ $# -ne 1 ]; then
-    echo -e "${RED}Usage: $0 <path_to_scenario_file>${NC}"
+HEADLESS_ARG="--headless"
+SCENARIO_FILE=""
+
+# Parse arguments
+while [[ $# -gt 0 ]]; do
+    case "$1" in
+        --gui)
+            HEADLESS_ARG=""
+            shift
+            ;;
+        *)
+            if [ -z "$SCENARIO_FILE" ]; then
+                SCENARIO_FILE="$1"
+            else
+                echo -e "${RED}Unknown argument: $1${NC}"
+                echo -e "Usage: $0 [--gui] <path_to_scenario_file>"
+                exit 1
+            fi
+            shift
+            ;;
+    esac
+done
+
+if [ -z "$SCENARIO_FILE" ]; then
+    echo -e "${RED}Usage: $0 [--gui] <path_to_scenario_file>${NC}"
     exit 1
 fi
-
-SCENARIO_FILE="$1"
 
 # Configuration
 DAP_PORT="${DAP_PORT:-6006}"
@@ -148,10 +169,14 @@ EOF
 
 echo -e "${YELLOW}Starting Godot with DAP server on port $DAP_PORT...${NC}"
 
+# Use $HEADLESS_ARG (empty by default unless --headless was removed from code, but here we use logic)
+# Actually, $HEADLESS_ARG is set at top.
+
 "$GODOT_BIN" \
     --editor \
     --path "$PROJECT_DIR" \
-    --headless \
+    $HEADLESS_ARG \
+    --debug-server tcp://127.0.0.1:6007 \
     > "/tmp/godot-console-runner-$$.log" 2>&1 &
 
 GODOT_PID=$!
@@ -176,6 +201,13 @@ if [[ "$SCENARIO_FILE" == *"attach"* ]]; then
     GAME_BREAKPOINT="res://test_script.gd:4"
     DEBUG_URI="tcp://127.0.0.1:6007"
     
+    # Wait for debugger port to be ready (Editor must be listening)
+    if ! wait_for_port 6007 $GODOT_STARTUP_TIMEOUT; then
+        echo -e "${RED}✗ Failed to start Godot Debugger server (port 6007)${NC}"
+        tail -n 20 "/tmp/godot-console-runner-$$.log"
+        exit 1
+    fi
+    
     echo -e "${YELLOW}Launching game with breakpoint at $GAME_BREAKPOINT...${NC}"
     echo -e "${YELLOW}Connecting to debugger at $DEBUG_URI...${NC}"
     
@@ -183,6 +215,7 @@ if [[ "$SCENARIO_FILE" == *"attach"* ]]; then
         --path "$PROJECT_DIR" \
         --breakpoints "$GAME_BREAKPOINT" \
         --remote-debug "$DEBUG_URI" \
+        $HEADLESS_ARG \
         > "/tmp/godot-game-$$.log" 2>&1 &
         
     GAME_PID=$!
